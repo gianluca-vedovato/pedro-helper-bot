@@ -147,44 +147,7 @@ function ensureClients() {
       return ctx.reply("✅ Promemoria cancellato.");
     });
 
-    // Poll created (message with poll)
-    bot.on("message:poll", async (ctx) => {
-      try {
-        const poll = ctx.message?.poll;
-        if (!poll) return;
-        const poll_id = poll.id;
-        const chat_id = ctx.chat?.id;
-        const message_id = ctx.message?.message_id;
-        const creator_user_id = ctx.from?.id;
-        const question = poll.question || "";
-        const options = (poll.options || []).map((o) => o.text);
-        await savePoll({
-          poll_id,
-          chat_id,
-          message_id,
-          creator_user_id,
-          question,
-          options,
-        });
-        const cmd = `/applica_sondaggio ${poll_id}`;
-        const text = `🗳️ Sondaggio registrato.\nID: \`${poll_id}\`\nPer applicare i risultati: ${cmd} (solo admin)`;
-        await ctx.reply(text, {
-          parse_mode: "Markdown",
-          reply_markup: {
-            inline_keyboard: [
-              [
-                {
-                  text: "Applica sondaggio",
-                  callback_data: `apply:${poll_id}`,
-                },
-              ],
-            ],
-          },
-        });
-      } catch (e) {
-        console.error("Poll save error", e);
-      }
-    });
+    // Poll created (message with poll) - RIMOSSO: duplicato con bot.on('message')
 
     // Poll updates (vote changes/closed)
     bot.on("poll", async (ctx) => {
@@ -192,14 +155,37 @@ function ensureClients() {
         console.log("Poll update received:", JSON.stringify(ctx.update));
         const poll = ctx.update?.poll;
         if (!poll) return;
-        const results = Object.fromEntries(
-          (poll.options || []).map((o) => [o.text, o.voter_count])
-        );
-        await updatePollResults({
-          poll_id: poll.id,
-          is_closed: !!poll.is_closed,
-          results,
-        });
+
+        // Se è un nuovo sondaggio (non ha voter_count > 0), salvalo
+        if (poll.total_voter_count === 0 && !poll.is_closed) {
+          console.log("New poll detected, saving to database");
+          const poll_id = poll.id;
+          const question = poll.question || "";
+          const options = (poll.options || []).map((o) => o.text);
+
+          // Salva il sondaggio (chat_id e message_id non disponibili in poll update)
+          await savePoll({
+            poll_id,
+            chat_id: null, // Non disponibile in poll update
+            message_id: null,
+            creator_user_id: null,
+            question,
+            options,
+          });
+
+          // Non possiamo rispondere qui perché non abbiamo il chat_id
+          console.log("Poll saved but cannot reply without chat context");
+        } else {
+          // Aggiorna risultati esistenti
+          const results = Object.fromEntries(
+            (poll.options || []).map((o) => [o.text, o.voter_count])
+          );
+          await updatePollResults({
+            poll_id: poll.id,
+            is_closed: !!poll.is_closed,
+            results,
+          });
+        }
       } catch (e) {
         console.error("Poll update error", e);
       }
@@ -218,6 +204,12 @@ function ensureClients() {
           const creator_user_id = ctx.from?.id;
           const question = poll.question || "";
           const options = (poll.options || []).map((o) => o.text);
+
+          console.log("Saving poll to database:", {
+            poll_id,
+            chat_id,
+            question,
+          });
           await savePoll({
             poll_id,
             chat_id,
@@ -226,8 +218,11 @@ function ensureClients() {
             question,
             options,
           });
+
           const cmd = `/applica_sondaggio ${poll_id}`;
           const text = `🗳️ Sondaggio registrato.\nID: \`${poll_id}\`\nPer applicare i risultati: ${cmd} (solo admin)`;
+          console.log("Sending poll response:", text);
+
           await ctx.reply(text, {
             parse_mode: "Markdown",
             reply_markup: {
@@ -241,6 +236,8 @@ function ensureClients() {
               ],
             },
           });
+
+          console.log("Poll response sent successfully");
         }
       } catch (e) {
         console.error("Message handler error:", e);
@@ -384,6 +381,17 @@ async function savePoll({
 }) {
   if (!supabase) return;
   const options_json = JSON.stringify(options || []);
+
+  // Se mancano chat_id o message_id, non possiamo salvare completamente
+  if (!chat_id || !message_id) {
+    console.log("Cannot save poll without chat_id or message_id:", {
+      poll_id,
+      chat_id,
+      message_id,
+    });
+    return;
+  }
+
   await supabase.from("polls").upsert({
     poll_id,
     chat_id,
@@ -392,6 +400,7 @@ async function savePoll({
     question,
     options_json,
   });
+  console.log("Poll saved successfully:", poll_id);
 }
 
 async function updatePollResults({ poll_id, is_closed, results }) {
