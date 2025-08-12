@@ -406,7 +406,6 @@ async function askAboutRules(question, rulesText) {
         },
         { role: "user", content: prompt },
       ],
-      temperature: 0.7,
       max_completion_tokens: 500,
     });
 
@@ -717,7 +716,6 @@ async function decideRuleActionWithTools({
       ],
       tools,
       tool_choice: "auto",
-      temperature: 0,
       max_completion_tokens: 500,
     });
     const tcalls = resp.choices?.[0]?.message?.tool_calls || [];

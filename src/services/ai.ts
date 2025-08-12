@@ -20,7 +20,6 @@ export async function askAboutRules(question: string, rulesText: string, model =
       { role: 'system', content: 'Sei un assistente esperto di fantacalcio che risponde solo in base al regolamento fornito.' },
       { role: 'user', content: prompt }
     ],
-    temperature: 0.7,
     max_completion_tokens: 500
   })
   return resp.choices?.[0]?.message?.content?.trim() || 'Errore nella risposta.'
@@ -91,7 +90,6 @@ export async function decideRuleActionWithTools(args: {
     ],
     tools,
     tool_choice: 'auto',
-    temperature: 0,
     max_completion_tokens: 500
   })
   const tcalls = resp.choices?.[0]?.message?.tool_calls || []
