@@ -44,6 +44,53 @@ Pedro è un bot Telegram intelligente che gestisce regole per il fantacalcio uti
    python bot.py
    ```
 
+## 🚀 Deploy (Node + Netlify Functions) — Consigliato per deploy gratuito
+
+Questa versione prevede un webhook serverless su Netlify Functions scritto in Node, integrato con Supabase e OpenAI.
+
+### Requisiti
+- Node 18+
+- Netlify (free tier)
+- Supabase (free tier)
+- OpenAI API Key
+
+### Setup Supabase
+1. Apri Supabase > SQL Editor
+2. Esegui `supabase_setup.sql` (crea tabelle `rules`, `reminders`, `polls` e policy di esempio)
+
+### Variabili d'ambiente (Netlify)
+Impostale nella Dashboard Netlify (Site settings > Build & deploy > Environment):
+- `BOT_TOKEN` (Telegram)
+- `OPENAI_API_KEY`
+- `OPENAI_MODEL` (es. `gpt-4o-mini`)
+- `SUPABASE_URL`
+- `SUPABASE_ANON_KEY`
+
+### Deploy
+1. Effettua il deploy su Netlify (repo connesso o drag-and-drop). Le Functions sono in `netlify/functions/`.
+2. L’endpoint del webhook sarà:
+   - `https://<site>.netlify.app/.netlify/functions/telegram-webhook`
+3. Imposta il webhook Telegram:
+   ```bash
+   curl -X POST "https://api.telegram.org/bot$BOT_TOKEN/setWebhook" \
+     -d url="https://<site>.netlify.app/.netlify/functions/telegram-webhook"
+   ```
+
+### Test locale (facoltativo)
+```bash
+npm install
+npm start
+# POST di prova:
+curl -X POST http://localhost:8787 -H 'content-type: application/json' -d '{"update_id":1,"message":{"message_id":1,"chat":{"id":123},"text":"/start"}}'
+```
+
+### Comandi supportati (Node)
+- `/start`, `/help`
+- `/regolamento [numero]`
+- `/askpedro [domanda]`
+- `/promemoria`, `/promemoria_lista`, `/promemoria_cancella <id>`
+- Sondaggi: salvataggio automatico, aggiornamento risultati, pulsante “Applica sondaggio”, `/applica_sondaggio <poll_id>`, `sondaggio_manuale` con AI tool-calling per `add/update/remove` regole. La risposta include la nuova/aggiornata regola.
+
 ## 📱 Comandi Disponibili
 
 ### Comandi Base
