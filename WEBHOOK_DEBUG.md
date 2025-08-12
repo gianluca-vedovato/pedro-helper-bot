@@ -1,78 +1,89 @@
 # Debug Webhook Telegram - Sondaggi non rilevati
 
-## Problema
-Il bot non risponde quando crei un sondaggio. Questo può essere dovuto a:
+## Problema Attuale
+Il webhook riceve gli update dei sondaggi ma non invia mai risposte. Dai log vediamo:
 
-1. **Webhook non configurato correttamente**
-2. **Tipi di update non abilitati**
-3. **Handler non registrato per i sondaggi**
+1. **Sondaggio creato** (update 459461196) - viene gestito da `bot.on('poll')` ma non ha chat_id
+2. **Sondaggio votato/chiuso** (update 459461197) - viene gestito da `bot.on('poll')` 
+3. **Comando `/applica_sondaggio`** (update 459461198, 459461200) - viene ricevuto ma non processato
 
-## Soluzioni
+## Soluzioni Implementate
 
-### 1. Verifica Webhook
-```bash
-# Sostituisci con i tuoi valori
-npm run check-webhook <BOT_TOKEN> <WEBHOOK_URL>
+### 1. Handler Corretti
+- **`bot.on('message')`**: Cattura messaggi con sondaggi e invia risposta
+- **`bot.on('poll')`**: Solo aggiorna risultati esistenti (voti, chiusura)
+- **`bot.hears(/\/applica_sondaggio(@\w+)?\s+(.+)/)`: Gestisce comando con @botname
 
-# Esempio:
-npm run check-webhook 123456:ABC-DEF https://site.netlify.app/.netlify/functions/telegram-webhook
-```
+### 2. Logging Esteso
+- Aggiunto logging per tutti i passaggi
+- Tracciamento comandi ricevuti
+- Debug database e AI
 
-### 2. Configurazione Manuale Webhook
-```bash
-curl -X POST "https://api.telegram.org/bot<BOT_TOKEN>/setWebhook" \
-  -d url="https://<site>.netlify.app/.netlify/functions/telegram-webhook" \
-  -d allowed_updates='["message","poll","callback_query","poll_answer"]'
-```
+## Debug Steps
 
-### 3. Verifica Log Netlify
-- Vai su Netlify Dashboard > Functions > telegram-webhook
-- Controlla i log per vedere se arrivano update
+### 1. Deploy Aggiornato
+- Fai nuovo deploy su Netlify con il codice aggiornato
+
+### 2. Test Sondaggio
+- Crea un nuovo sondaggio
+- Dovresti vedere nei log:
+  ```
+  Poll message detected: {...}
+  Saving poll to database: {...}
+  Sending poll response: ...
+  Poll response sent successfully
+  ```
+
+### 3. Test Comando
+- Usa `/applica_sondaggio <poll_id>` o `/applica_sondaggio@botname <poll_id>`
 - Dovresti vedere:
   ```
-  Webhook received: {"update_id":123,"message":{...}}
-  Parsed update: {"update_id":123,"message":{...}}
+  Applica sondaggio command received: ...
+  Extracted poll_id: ...
+  handleApplyPoll called with poll_id: ...
   ```
 
-### 4. Test Locale
-```bash
-npm start
-# In un altro terminale:
-curl -X POST http://localhost:8787 \
-  -H 'content-type: application/json' \
-  -d '{"update_id":1,"message":{"message_id":1,"chat":{"id":123},"text":"/start"}}'
-```
-
-### 5. Verifica Permessi Bot
-Il bot deve avere permessi per:
-- Leggere messaggi
-- Inviare messaggi
-- Gestire sondaggi
+### 4. Verifica Database
+- Controlla che il sondaggio sia salvato in Supabase
+- Verifica che le regole siano caricate
 
 ## Struttura Update Telegram
 ```json
+// Creazione sondaggio
 {
   "update_id": 123,
   "message": {
-    "message_id": 456,
     "chat": {"id": 789},
     "poll": {
       "id": "poll_123",
       "question": "Domanda?",
-      "options": [{"text": "Opzione 1"}, {"text": "Opzione 2"}]
+      "options": [{"text": "Opzione 1"}]
     }
+  }
+}
+
+// Aggiornamento sondaggio
+{
+  "update_id": 124,
+  "poll": {
+    "id": "poll_123",
+    "options": [{"text": "Opzione 1", "voter_count": 1}],
+    "is_closed": true
   }
 }
 ```
 
 ## Handler Registrati
-- `bot.on('message')` - Cattura tutti i messaggi (inclusi sondaggi)
-- `bot.on('poll')` - Cattura aggiornamenti sondaggi
+- `bot.on('message')` - Cattura messaggi con sondaggi e invia risposta
+- `bot.on('poll')` - Aggiorna risultati esistenti
+- `bot.command('applica_sondaggio')` - Gestisce comando base
+- `bot.hears(/\/applica_sondaggio(@\w+)?\s+(.+)/)` - Gestisce comando con @botname
 - `bot.action(/apply:.+/)` - Gestisce pulsante "Applica sondaggio"
 
 ## Debug Steps
 1. ✅ Verifica webhook con `npm run check-webhook`
 2. ✅ Controlla log Netlify Functions
 3. ✅ Testa comando `/start` (deve funzionare)
-4. ✅ Crea sondaggio e controlla log
-5. ✅ Verifica che `allowed_updates` includa `poll`
+4. ✅ Crea sondaggio e controlla log per "Poll message detected"
+5. ✅ Usa `/applica_sondaggio <poll_id>` e controlla log per "Applica sondaggio command received"
+6. ✅ Verifica che `allowed_updates` includa `poll`

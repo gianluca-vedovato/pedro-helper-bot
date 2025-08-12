@@ -156,36 +156,15 @@ function ensureClients() {
         const poll = ctx.update?.poll;
         if (!poll) return;
 
-        // Se è un nuovo sondaggio (non ha voter_count > 0), salvalo
-        if (poll.total_voter_count === 0 && !poll.is_closed) {
-          console.log("New poll detected, saving to database");
-          const poll_id = poll.id;
-          const question = poll.question || "";
-          const options = (poll.options || []).map((o) => o.text);
-
-          // Salva il sondaggio (chat_id e message_id non disponibili in poll update)
-          await savePoll({
-            poll_id,
-            chat_id: null, // Non disponibile in poll update
-            message_id: null,
-            creator_user_id: null,
-            question,
-            options,
-          });
-
-          // Non possiamo rispondere qui perché non abbiamo il chat_id
-          console.log("Poll saved but cannot reply without chat context");
-        } else {
-          // Aggiorna risultati esistenti
-          const results = Object.fromEntries(
-            (poll.options || []).map((o) => [o.text, o.voter_count])
-          );
-          await updatePollResults({
-            poll_id: poll.id,
-            is_closed: !!poll.is_closed,
-            results,
-          });
-        }
+        // Aggiorna risultati esistenti
+        const results = Object.fromEntries(
+          (poll.options || []).map((o) => [o.text, o.voter_count])
+        );
+        await updatePollResults({
+          poll_id: poll.id,
+          is_closed: !!poll.is_closed,
+          results,
+        });
       } catch (e) {
         console.error("Poll update error", e);
       }
@@ -266,15 +245,45 @@ function ensureClients() {
     });
 
     bot.command("applica_sondaggio", async (ctx) => {
+      console.log("Applica sondaggio command received:", ctx.message?.text);
       const poll_id = (ctx.message?.text || "").split(" ").slice(1)[0];
+      console.log("Extracted poll_id:", poll_id);
       if (!poll_id) return ctx.reply("Uso: /applica_sondaggio <poll_id>");
       const chat_id = ctx.chat?.id;
       const user_id = ctx.from?.id;
+      console.log("Checking admin status for:", { chat_id, user_id });
       const isAdmin = await isUserAdmin(chat_id, user_id);
+      console.log("Is admin:", isAdmin);
       if (!isAdmin)
         return ctx.reply(
           "❌ Solo gli amministratori possono applicare un sondaggio."
         );
+      console.log("Proceeding with poll application for:", poll_id);
+      await handleApplyPoll(ctx, poll_id);
+    });
+
+    // Gestisce anche /applica_sondaggio@botname
+    bot.hears(/\/applica_sondaggio(@\w+)?\s+(.+)/, async (ctx) => {
+      console.log(
+        "Applica sondaggio heard command received:",
+        ctx.message?.text
+      );
+      const match = ctx.message?.text?.match(
+        /\/applica_sondaggio(@\w+)?\s+(.+)/
+      );
+      if (!match) return;
+      const poll_id = match[2].trim();
+      console.log("Extracted poll_id from heard:", poll_id);
+      const chat_id = ctx.chat?.id;
+      const user_id = ctx.from?.id;
+      console.log("Checking admin status for heard:", { chat_id, user_id });
+      const isAdmin = await isUserAdmin(chat_id, user_id);
+      console.log("Is admin for heard:", isAdmin);
+      if (!isAdmin)
+        return ctx.reply(
+          "❌ Solo gli amministratori possono applicare un sondaggio."
+        );
+      console.log("Proceeding with poll application for heard:", poll_id);
       await handleApplyPoll(ctx, poll_id);
     });
 
@@ -437,12 +446,15 @@ function parseQuotedArgs(text) {
 }
 
 async function handleApplyPoll(ctx, poll_id) {
+  console.log("handleApplyPoll called with poll_id:", poll_id);
   const pollRow = await getPoll(poll_id);
+  console.log("Poll row from database:", pollRow);
   if (!pollRow)
     return ctx.reply(
-      "❌ Sondaggio non trovato nel database. Rispondi al messaggio del sondaggio con /applica_sondaggio oppure riprova più tardi."
+      "❌ Sondaggio non trovato nel database. Rispondi al messaggio con /applica_sondaggio oppure riprova più tardi."
     );
   const rules = await getAllRules();
+  console.log("Rules loaded:", rules.length);
   const rulesText = rules
     .map((r) => `${r.rule_number}. ${r.content}`)
     .join("\n\n");
@@ -455,11 +467,13 @@ async function handleApplyPoll(ctx, poll_id) {
   try {
     results = JSON.parse(pollRow.results_json || "{}");
   } catch {}
+  console.log("Parsed poll data:", { question, options, results });
   const sorted = Object.entries(results).sort((a, b) => b[1] - a[1]);
   const winning = sorted.length ? sorted[0][0] : null;
   const summary = sorted.length
     ? sorted.map(([o, c]) => `${o}: ${c}`).join(", ")
     : null;
+  console.log("Poll analysis:", { winning, summary });
   await applyDecisionFromAI(ctx, {
     question,
     options,
