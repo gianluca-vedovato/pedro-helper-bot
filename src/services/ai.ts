@@ -21,7 +21,7 @@ export async function askAboutRules(question: string, rulesText: string, model =
       { role: 'user', content: prompt }
     ],
     temperature: 0.7,
-    max_tokens: 500
+    max_completion_tokens: 500
   })
   return resp.choices?.[0]?.message?.content?.trim() || 'Errore nella risposta.'
 }
@@ -92,7 +92,7 @@ export async function decideRuleActionWithTools(args: {
     tools,
     tool_choice: 'auto',
     temperature: 0,
-    max_tokens: 500
+    max_completion_tokens: 500
   })
   const tcalls = resp.choices?.[0]?.message?.tool_calls || []
   return tcalls.map((t) => {

@@ -18,9 +18,17 @@ let openai;
 let supabase;
 
 function ensureClients() {
+  console.log("ensureClients called");
+  console.log("BOT_TOKEN configured:", !!process.env.BOT_TOKEN);
+  console.log("OPENAI_API_KEY configured:", !!process.env.OPENAI_API_KEY);
+  console.log("SUPABASE_URL configured:", !!process.env.SUPABASE_URL);
+  console.log("SUPABASE_ANON_KEY configured:", !!process.env.SUPABASE_ANON_KEY);
+
   if (!bot) {
     if (!BOT_TOKEN) throw new Error("Missing BOT_TOKEN");
+    console.log("Creating Telegraf bot instance...");
     bot = new Telegraf(BOT_TOKEN);
+    console.log("Telegraf bot instance created");
 
     // Commands
     bot.start(async (ctx) => {
@@ -65,20 +73,44 @@ function ensureClients() {
     });
 
     bot.command("askpedro", async (ctx) => {
-      const q = (ctx.message?.text || "").split(" ").slice(1).join(" ").trim();
-      if (!q) return ctx.reply("❌ Uso: /askpedro [domanda]");
-      const rules = await getAllRules();
-      if (!rules.length) return ctx.reply("❌ Nessuna regola caricata.");
-      const rulesText = rules
-        .map((r) => `${r.rule_number}. ${r.content}`)
-        .join("\n\n");
       try {
+        console.log("askpedro command received");
+        const q = (ctx.message?.text || "")
+          .split(" ")
+          .slice(1)
+          .join(" ")
+          .trim();
+        console.log("Question extracted:", q);
+
+        if (!q) {
+          console.log("No question provided");
+          return ctx.reply("❌ Uso: /askpedro [domanda]");
+        }
+
+        console.log("Getting rules from database...");
+        const rules = await getAllRules();
+        console.log(`Retrieved ${rules.length} rules`);
+
+        if (!rules.length) {
+          console.log("No rules found in database");
+          return ctx.reply("❌ Nessuna regola caricata.");
+        }
+
+        const rulesText = rules
+          .map((r) => `${r.rule_number}. ${r.content}`)
+          .join("\n\n");
+        console.log("Rules text prepared, length:", rulesText.length);
+
+        console.log("Calling OpenAI...");
         const answer = await askAboutRules(q, rulesText);
+        console.log("OpenAI response received, length:", answer.length);
+
         await ctx.reply(`🤖 Pedro dice:\n\n${answer}`, {
           parse_mode: "Markdown",
         });
+        console.log("Response sent successfully");
       } catch (e) {
-        console.error(e);
+        console.error("Error in askpedro command:", e);
         await ctx.reply("Errore AI, riprova più tardi.");
       }
     });
@@ -318,13 +350,29 @@ function ensureClients() {
       });
     });
   }
+
+  // Initialize OpenAI client
   if (!openai) {
     if (!OPENAI_API_KEY) throw new Error("Missing OPENAI_API_KEY");
+    console.log("Creating OpenAI client...");
     openai = new OpenAI({ apiKey: OPENAI_API_KEY });
+    console.log("OpenAI client created successfully");
+  } else {
+    console.log("OpenAI client already exists");
   }
+
+  // Initialize Supabase client
   if (!supabase && SUPABASE_URL && SUPABASE_ANON_KEY) {
+    console.log("Creating Supabase client...");
     supabase = createSupabaseClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    console.log("Supabase client created successfully");
+  } else if (supabase) {
+    console.log("Supabase client already exists");
+  } else {
+    console.log("Supabase client not configured - skipping");
   }
+
+  console.log("ensureClients completed");
 }
 
 function formatRule(content) {
@@ -337,36 +385,70 @@ function formatRule(content) {
 }
 
 async function askAboutRules(question, rulesText) {
-  const prompt = `Sei un assistente esperto di fantacalcio. Rispondi alla seguente domanda basandoti SOLO sul regolamento fornito.\n\nRegolamento:\n${rulesText}\n\nDomanda: ${question}\n\nRispondi in italiano in modo chiaro e conciso, citando le regole specifiche quando possibile. Se la domanda non riguarda il regolamento, rispondi semplicemente "Non nel regolamento".`;
-  const resp = await openai.chat.completions.create({
-    model: OPENAI_MODEL,
-    messages: [
-      {
-        role: "system",
-        content:
-          "Sei un assistente esperto di fantacalcio che risponde solo in base al regolamento fornito.",
-      },
-      { role: "user", content: prompt },
-    ],
-    temperature: 0.7,
-    max_tokens: 500,
-  });
-  return (
-    resp.choices?.[0]?.message?.content?.trim() || "Errore nella risposta."
-  );
+  try {
+    console.log("askAboutRules called with question:", question);
+    console.log("Rules text length:", rulesText.length);
+
+    if (!openai) {
+      throw new Error("OpenAI client not initialized");
+    }
+
+    const prompt = `Sei un assistente esperto di fantacalcio. Rispondi alla seguente domanda basandoti SOLO sul regolamento fornito.\n\nRegolamento:\n${rulesText}\n\nDomanda: ${question}\n\nRispondi in italiano in modo chiaro e conciso, citando le regole specifiche quando possibile. Se la domanda non riguarda il regolamento, rispondi semplicemente "Non nel regolamento".`;
+
+    console.log("Sending request to OpenAI...");
+    const resp = await openai.chat.completions.create({
+      model: OPENAI_MODEL,
+      messages: [
+        {
+          role: "system",
+          content:
+            "Sei un assistente esperto di fantacalcio che risponde solo in base al regolamento fornito.",
+        },
+        { role: "user", content: prompt },
+      ],
+      temperature: 0.7,
+      max_completion_tokens: 500,
+    });
+
+    console.log("OpenAI response received");
+    const content = resp.choices?.[0]?.message?.content?.trim();
+    if (!content) {
+      throw new Error("Empty response from OpenAI");
+    }
+
+    return content;
+  } catch (error) {
+    console.error("Error in askAboutRules:", error);
+    throw error;
+  }
 }
 
 async function getAllRules() {
-  if (supabase) {
+  try {
+    console.log("getAllRules called");
+
+    if (!supabase) {
+      console.log("Supabase client not configured, returning empty rules");
+      return [];
+    }
+
+    console.log("Querying Supabase for rules...");
     const { data, error } = await supabase
       .from("rules")
       .select("rule_number, content")
       .order("rule_number", { ascending: true });
-    if (error) throw error;
+
+    if (error) {
+      console.error("Supabase error:", error);
+      throw error;
+    }
+
+    console.log(`Retrieved ${data?.length || 0} rules from database`);
     return data || [];
+  } catch (error) {
+    console.error("Error in getAllRules:", error);
+    throw error;
   }
-  // If no Supabase configured, return empty (or switch to D1/SQLite on other hosts)
-  return [];
 }
 
 async function isUserAdmin(chat_id, user_id) {
@@ -636,7 +718,7 @@ async function decideRuleActionWithTools({
       tools,
       tool_choice: "auto",
       temperature: 0,
-      max_tokens: 500,
+      max_completion_tokens: 500,
     });
     const tcalls = resp.choices?.[0]?.message?.tool_calls || [];
     const calls = [];
@@ -698,18 +780,69 @@ async function deleteRule(rule_number) {
 
 export async function handler(event) {
   try {
+    console.log("=== Webhook handler started ===");
+    console.log("Event body type:", typeof event.body);
+    console.log("Event body length:", event.body ? event.body.length : 0);
+
+    // Validate environment variables
+    if (!process.env.BOT_TOKEN) {
+      throw new Error("Missing BOT_TOKEN environment variable");
+    }
+    if (!process.env.OPENAI_API_KEY) {
+      throw new Error("Missing OPENAI_API_KEY environment variable");
+    }
+    if (!process.env.SUPABASE_URL || !process.env.SUPABASE_ANON_KEY) {
+      console.warn(
+        "Supabase environment variables not configured - some features may not work"
+      );
+    }
+
+    console.log("Environment variables validated");
+
+    // Initialize clients
     ensureClients();
-    console.log("Webhook received:", JSON.stringify(event.body || {}));
-    // Telegram sends JSON updates to webhook
-    const update = event.body ? JSON.parse(event.body) : {};
-    console.log("Parsed update:", JSON.stringify(update));
+    console.log("Clients initialized successfully");
+
+    // Parse and validate Telegram update
+    if (!event.body) {
+      throw new Error("No body in event");
+    }
+
+    let update;
+    try {
+      update = JSON.parse(event.body);
+    } catch (parseError) {
+      throw new Error(
+        `Failed to parse event body as JSON: ${parseError.message}`
+      );
+    }
+
+    console.log("Telegram update parsed successfully");
+    console.log(
+      "Update type:",
+      update.message?.text ? "text message" : "other"
+    );
+
+    // Handle the update
     await bot.handleUpdate(update);
-    return { statusCode: 200, body: JSON.stringify({ ok: true }) };
+    console.log("Update handled successfully");
+
+    return {
+      statusCode: 200,
+      body: JSON.stringify({ ok: true, timestamp: new Date().toISOString() }),
+    };
   } catch (e) {
-    console.error(e);
+    console.error("=== Webhook handler error ===");
+    console.error("Error details:", e);
+    console.error("Error stack:", e.stack);
+
     return {
       statusCode: 500,
-      body: JSON.stringify({ ok: false, error: String(e) }),
+      body: JSON.stringify({
+        ok: false,
+        error: String(e),
+        timestamp: new Date().toISOString(),
+      }),
     };
   }
 }
