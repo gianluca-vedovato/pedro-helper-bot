@@ -189,6 +189,7 @@ function ensureClients() {
     // Poll updates (vote changes/closed)
     bot.on("poll", async (ctx) => {
       try {
+        console.log("Poll update received:", JSON.stringify(ctx.update));
         const poll = ctx.update?.poll;
         if (!poll) return;
         const results = Object.fromEntries(
@@ -201,6 +202,48 @@ function ensureClients() {
         });
       } catch (e) {
         console.error("Poll update error", e);
+      }
+    });
+
+    // Catch-all for any message type (including polls)
+    bot.on("message", async (ctx) => {
+      try {
+        const message = ctx.message;
+        if (message?.poll) {
+          console.log("Poll message detected:", JSON.stringify(message.poll));
+          const poll = message.poll;
+          const poll_id = poll.id;
+          const chat_id = ctx.chat?.id;
+          const message_id = ctx.message?.message_id;
+          const creator_user_id = ctx.from?.id;
+          const question = poll.question || "";
+          const options = (poll.options || []).map((o) => o.text);
+          await savePoll({
+            poll_id,
+            chat_id,
+            message_id,
+            creator_user_id,
+            question,
+            options,
+          });
+          const cmd = `/applica_sondaggio ${poll_id}`;
+          const text = `🗳️ Sondaggio registrato.\nID: \`${poll_id}\`\nPer applicare i risultati: ${cmd} (solo admin)`;
+          await ctx.reply(text, {
+            parse_mode: "Markdown",
+            reply_markup: {
+              inline_keyboard: [
+                [
+                  {
+                    text: "Applica sondaggio",
+                    callback_data: `apply:${poll_id}`,
+                  },
+                ],
+              ],
+            },
+          });
+        }
+      } catch (e) {
+        console.error("Message handler error:", e);
       }
     });
 
@@ -341,16 +384,14 @@ async function savePoll({
 }) {
   if (!supabase) return;
   const options_json = JSON.stringify(options || []);
-  await supabase
-    .from("polls")
-    .upsert({
-      poll_id,
-      chat_id,
-      message_id,
-      creator_user_id,
-      question,
-      options_json,
-    });
+  await supabase.from("polls").upsert({
+    poll_id,
+    chat_id,
+    message_id,
+    creator_user_id,
+    question,
+    options_json,
+  });
 }
 
 async function updatePollResults({ poll_id, is_closed, results }) {
@@ -635,8 +676,10 @@ async function deleteRule(rule_number) {
 export async function handler(event) {
   try {
     ensureClients();
+    console.log("Webhook received:", JSON.stringify(event.body || {}));
     // Telegram sends JSON updates to webhook
     const update = event.body ? JSON.parse(event.body) : {};
+    console.log("Parsed update:", JSON.stringify(update));
     await bot.handleUpdate(update);
     return { statusCode: 200, body: JSON.stringify({ ok: true }) };
   } catch (e) {
