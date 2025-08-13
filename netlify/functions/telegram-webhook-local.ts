@@ -1,22 +1,23 @@
 import 'dotenv/config'
 import http from 'http'
-import handler from './telegram-webhook'
+import { handler } from './telegram-webhook'
 
 const port = Number(process.env.PORT || 8787)
 const server = http.createServer(async (req, res) => {
-  if (req.method !== 'POST') {
-    res.writeHead(200, { 'content-type': 'text/plain' })
-    return res.end('ok')
-  }
   let body = ''
   req.on('data', (chunk) => (body += chunk))
   req.on('end', async () => {
     try {
-      const result = await handler({ body, method: 'POST', url: req.url }, res)
-      if (result) {
-        res.writeHead(200, { 'content-type': 'application/json' })
-        res.end(JSON.stringify(result))
-      }
+      const result = await handler({
+        httpMethod: req.method,
+        rawUrl: req.url,
+        body
+      })
+      const statusCode = (result && (result as any).statusCode) || 200
+      const headers = (result && (result as any).headers) || { 'content-type': 'application/json' }
+      const responseBody = (result && (result as any).body) || '{}'
+      res.writeHead(statusCode, headers)
+      res.end(typeof responseBody === 'string' ? responseBody : JSON.stringify(responseBody))
     } catch (error) {
       console.error('Error in local handler:', error)
       res.writeHead(500, { 'content-type': 'application/json' })
