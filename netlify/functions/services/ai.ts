@@ -107,8 +107,7 @@ export async function applyPollToRules(params: {
       { role: 'user', content: userContent }
     ],
     tools,
-    tool_choice: 'required',
-    temperature: 0
+    tool_choice: 'required'
   })
 
   const toolCalls = completion.choices?.[0]?.message?.tool_calls || []
