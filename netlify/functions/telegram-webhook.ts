@@ -114,11 +114,7 @@ function ensureBot() {
         }
         await pollsUpsert(snapshot)
         const text = buildPollRegisteredText(snapshot.poll_id, snapshot.question, snapshot.options)
-        await ctx.reply(text, {
-          reply_markup: {
-            inline_keyboard: [[{ text: 'Applica', callback_data: `applica_poll:${snapshot.poll_id}` }]]
-          }
-        })
+        await ctx.reply(text)
       } catch (e) {
         console.error('Errore gestione messaggio sondaggio:', e)
       }
@@ -141,7 +137,7 @@ function ensureBot() {
         if (existing) {
           await pollsUpsert({ ...snapshot, chat_id: existing.chat_id, message_id: existing.message_id })
           if (snapshot.is_closed) {
-            const text = buildPollRegisteredText(snapshot.poll_id, snapshot.question, snapshot.options)
+            const text = buildPollClosedText(snapshot.poll_id, snapshot.question, snapshot.options)
             await ctx.telegram.sendMessage(existing.chat_id, text, {
               reply_markup: {
                 inline_keyboard: [[{ text: 'Applica', callback_data: `applica_poll:${snapshot.poll_id}` }]]
@@ -226,11 +222,25 @@ function buildPollRegisteredText(pollId: string, question: string, options: { te
     '🗳️ Sondaggio registrato!\n',
     `📝 Domanda: ${question}`,
     `🔢 Opzioni: ${optionsText}`,
-    `🆔 ID: ${pollId}\n`,
-    '💡 Per applicare i risultati:',
-    '• Rispondi a questo messaggio con /applica_sondaggio',
-    `• Oppure usa /applica_sondaggio ${pollId}\n`,
-    '⚠️ Solo gli amministratori possono applicare i risultati.'
+    `🆔 ID: ${pollId}`
+  ].join('\n')
+}
+
+function buildPollClosedText(pollId: string, question: string, options: { text: string; voter_count: number }[]): string {
+  const optionsText = options.map((o) => `${o.text} → ${o.voter_count} voti`).join('\n')
+  const totalVotes = options.reduce((sum, o) => sum + o.voter_count, 0)
+  const winningOptions = options.filter(o => o.voter_count === Math.max(...options.map(opt => opt.voter_count)))
+  
+  return [
+    '🔒 Sondaggio chiuso!\n',
+    `📝 Domanda: ${question}`,
+    `🔢 Risultati (${totalVotes} voti totali):`,
+    optionsText,
+    `\n🏆 Opzione/i vincente/i:`,
+    ...winningOptions.map(o => `• ${o.text} (${o.voter_count} voti)`),
+    `\n🆔 ID: ${pollId}`,
+    '\n💡 Per applicare i risultati, premi il pulsante "Applica" qui sotto.',
+    '\n⚠️ Solo gli amministratori possono applicare i risultati.'
   ].join('\n')
 }
 
