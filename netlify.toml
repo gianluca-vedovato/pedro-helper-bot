@@ -1,5 +1,5 @@
 [functions]
-  directory = "netlify/functions"
+  directory = "dist/netlify/functions"
   node_bundler = "esbuild"
 
 [build]

@@ -1,0 +1,35 @@
+functionsDirectory = "/Users/gianluca.vedovato/Sites/prsnl/pedro/netlify/functions"
+functionsDirectoryOrigin = "config"
+plugins = []
+headers = []
+redirects = []
+
+[build]
+publish = "/Users/gianluca.vedovato/Sites/prsnl/pedro"
+publishOrigin = "config"
+commandOrigin = "config"
+command = "npm run build:functions"
+functions = "/Users/gianluca.vedovato/Sites/prsnl/pedro/netlify/functions"
+
+[build.environment]
+
+[build.processing]
+
+[build.processing.css]
+
+[build.processing.html]
+
+[build.processing.images]
+
+[build.processing.js]
+
+[build.services]
+
+[functions]
+
+[functions.telegram-webhook]
+node_bundler = "esbuild"
+external_node_modules = ["@supabase/supabase-js"]
+
+[functions."*"]
+node_bundler = "esbuild"

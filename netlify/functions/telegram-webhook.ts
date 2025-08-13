@@ -1,6 +1,6 @@
 import { Telegraf } from 'telegraf'
 import type { Context } from 'telegraf'
-import { askAboutRules, decideRuleActionWithTools } from '../../src/services/ai'
+import { askAboutRules, decideRuleActionWithTools } from './services/ai'
 import {
   getSupabase,
   pollsGet,
@@ -11,7 +11,7 @@ import {
   rulesGetAll,
   rulesNextNumber,
   rulesUpsert
-} from '../../src/services/db'
+} from './services/db'
 
 const BOT_TOKEN = process.env.BOT_TOKEN
 

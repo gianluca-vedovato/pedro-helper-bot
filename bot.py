@@ -614,7 +614,7 @@ Il regolamento è già caricato e pronto all'uso! 🚀"""
         # Get answer from OpenAI
         answer = self.openai_helper.ask_about_rules(question, rules_text)
         
-        await update.message.reply_text(f"🤖 **Pedro dice:**\n\n{answer}", parse_mode='Markdown')
+        await update.message.reply_text(f"{answer}", parse_mode='Markdown')
     
     def run(self):
         """Start the bot"""

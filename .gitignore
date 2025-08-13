@@ -5,6 +5,7 @@ yarn-debug.log*
 yarn-error.log*
 
 # Build outputs
+dist/
 netlify/functions/*.js
 netlify/functions/*.js.map
 
@@ -40,5 +41,3 @@ coverage/
 # Temporary folders
 tmp/
 temp/ 
-# Local Netlify folder
-.netlify

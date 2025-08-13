@@ -8,7 +8,7 @@
   },
   "scripts": {
     "start": "tsx netlify/functions/telegram-webhook-local.ts",
-    "build:functions": "rm -f netlify/functions/*.js && tsc netlify/functions/*.ts --target es2020 --module esnext --moduleResolution node --esModuleInterop --allowSyntheticDefaultImports --skipLibCheck --noEmitOnError",
+    "build:functions": "rm -rf dist && tsc netlify/functions/*.ts --outDir dist/netlify/functions --target es2020 --module esnext --moduleResolution node --esModuleInterop --allowSyntheticDefaultImports --skipLibCheck --noEmitOnError",
     "lint": "eslint \"**/*.{ts,js}\"",
     "typecheck": "tsc --noEmit",
     "check-webhook": "node check_webhook.js"
