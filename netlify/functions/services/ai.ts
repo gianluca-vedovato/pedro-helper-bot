@@ -2,6 +2,13 @@ import OpenAI from 'openai'
 
 let client: OpenAI | null = null
 
+function isVerbose(): boolean {
+  const v = `${process.env.LOG_VERBOSE || process.env.DEBUG || ''}`.toLowerCase()
+  return v === '1' || v === 'true' || v.includes('verbose')
+}
+
+const verbose = isVerbose()
+
 function getClient(): OpenAI {
   if (!client) {
     const apiKey = process.env.OPENAI_API_KEY
@@ -20,7 +27,7 @@ export async function askAboutRules(question: string, rulesText: string, model =
       { role: 'system', content: 'Sei un assistente esperto di fantacalcio che risponde solo in base al regolamento fornito.' },
       { role: 'user', content: prompt }
     ],
-    max_completion_tokens: 500
+    max_tokens: 500
   })
   return resp.choices?.[0]?.message?.content?.trim() || 'Errore nella risposta.'
 }
@@ -33,20 +40,41 @@ export async function decideRuleActionWithTools(args: {
   poll_result_summary?: string | null
   model?: string
 }) {
+  // Schemi condivisi per compatibilità con latest-model custom tools (parameters/input_schema)
+  const addSchema: any = {
+    type: 'object',
+    properties: {
+      rule_number: { type: 'integer' },
+      content: { type: 'string' }
+    },
+    required: ['content'],
+    additionalProperties: false
+  }
+  const updateSchema: any = {
+    type: 'object',
+    properties: {
+      rule_number: { type: 'integer' },
+      content: { type: 'string' }
+    },
+    required: ['rule_number', 'content'],
+    additionalProperties: false
+  }
+  const removeSchema: any = {
+    type: 'object',
+    properties: {
+      rule_number: { type: 'integer' }
+    },
+    required: ['rule_number'],
+    additionalProperties: false
+  }
+
   const tools: OpenAI.ChatCompletionTool[] = [
     {
       type: 'function',
       function: {
         name: 'add_rule',
         description: 'Aggiungi una nuova regola (se non esiste già una regola sullo stesso tema).',
-        parameters: {
-          type: 'object',
-          properties: {
-            rule_number: { type: ['integer', 'null'] as any },
-            content: { type: 'string' }
-          },
-          required: ['content']
-        }
+        parameters: addSchema
       }
     },
     {
@@ -54,14 +82,7 @@ export async function decideRuleActionWithTools(args: {
       function: {
         name: 'update_rule',
         description: 'Aggiorna una regola esistente con un nuovo testo completo (sostitutivo).',
-        parameters: {
-          type: 'object',
-          properties: {
-            rule_number: { type: 'integer' },
-            content: { type: 'string' }
-          },
-          required: ['rule_number', 'content']
-        }
+        parameters: updateSchema
       }
     },
     {
@@ -69,35 +90,210 @@ export async function decideRuleActionWithTools(args: {
       function: {
         name: 'remove_rule',
         description: 'Rimuovi una regola esistente.',
-        parameters: {
-          type: 'object',
-          properties: {
-            rule_number: { type: 'integer' }
-          },
-          required: ['rule_number']
-        }
+        parameters: removeSchema
       }
     }
   ]
-  const system_msg = `Sei un assistente per la gestione di un regolamento del fantacalcio. Devi scegliere UNA e una sola tra le funzioni add_rule, update_rule, remove_rule.\n\nOBIETTIVO\n- Applica in modo fedele l'esito del sondaggio al regolamento.\n- Non inventare mai informazioni non presenti.\n\nSCELTA DELL'AZIONE\n- update_rule: se esiste già una regola sullo stesso tema.\n- remove_rule: se la domanda è del tipo ‘teniamo/aboliamo X?’ e prevale ‘No’.\n- add_rule: solo se introduce un elemento nuovo.\n\nSTILE\n- Italiano formale, testo pronto per regolamento.`
-  const user_msg = `Domanda sondaggio: ${args.poll_question}\nOpzioni: ${(args.poll_options || []).join(', ')}\nVincitore: ${args.winning_option || 'sconosciuto'}\nRisultati: ${args.poll_result_summary || 'n.d.'}\n\nRegolamento:\n${args.rules_text}`
+  const system_msg = `Sei un assistente per la gestione di regolamenti del fantacalcio. Il tuo compito è quello di leggere i sondaggi dei partecipanti che servono a cambiare regole e aggiornare il regolamento di conseguenza.
+
+Quando ricevi un sondaggio, devi:
+1. Analizzare la domanda e le opzioni
+2. Capire l'intento dei partecipanti
+3. Decidere se aggiungere, modificare o rimuovere una regola
+4. Creare il testo della nuova regola o della modifica
+
+Per fare questo, devi sempre usare una delle tre funzioni disponibili:
+- add_rule: per creare nuove regole o stabilire nuovi limiti
+- update_rule: per modificare regole esistenti
+- remove_rule: per rimuovere regole quando i partecipanti votano per abolirle
+
+Esempi di come interpretare i sondaggi:
+- "Mettiamo un massimo di francesi in squadra?" con opzione "massimo 2" → add_rule per creare un limite di 2 giocatori francesi
+- "Aboliamo la regola sui bonus?" con voto "sì" → remove_rule per rimuovere la regola esistente
+- "Cambiamo il bonus gol da 3 a 5 punti?" → update_rule per modificare la regola esistente
+
+Il tuo obiettivo è rendere il regolamento sempre più chiaro e completo, seguendo le decisioni dei partecipanti.
+
+IMPORTANTE: Non rispondere mai con testo libero. Devi SEMPRE chiamare ESATTAMENTE UNA delle funzioni disponibili (add_rule, update_rule o remove_rule). Se non sei sicuro, preferisci add_rule.`
+  const user_msg = `Ecco un sondaggio da analizzare:
+
+Domanda: ${args.poll_question}
+Opzioni disponibili: ${(args.poll_options || []).join(', ')}
+Risposta vincente: ${args.winning_option || 'sconosciuto'}
+Risultati completi: ${args.poll_result_summary || 'n.d.'}
+
+Regolamento attuale:
+${args.rules_text}
+
+Analizza questo sondaggio e decidi come aggiornare il regolamento. Usa una delle funzioni disponibili per implementare la decisione dei partecipanti.`
   const openai = getClient()
-  const resp = await openai.chat.completions.create({
-    model: args.model || process.env.OPENAI_MODEL || 'gpt-4o-mini',
-    messages: [
-      { role: 'system', content: system_msg },
-      { role: 'user', content: user_msg }
-    ],
-    tools,
-    tool_choice: 'auto',
-    max_completion_tokens: 500
+  
+  console.log('🤖 AI - Parametri ricevuti:', {
+    poll_question: args.poll_question,
+    poll_options: args.poll_options,
+    winning_option: args.winning_option,
+    poll_result_summary: args.poll_result_summary,
+    rules_text_length: args.rules_text.length
   })
-  const tcalls = resp.choices?.[0]?.message?.tool_calls || []
-  return tcalls.map((t) => {
-    let parsed: any
-    try { parsed = JSON.parse(t.function?.arguments || '{}') } catch { parsed = {} }
-    return { name: t.function?.name, arguments: parsed }
-  })
+  
+  console.log('🤖 AI - System message:', system_msg.substring(0, 200) + '...')
+  console.log('🤖 AI - User message:', user_msg.substring(0, 200) + '...')
+  
+  // Preferisci le Responses API per modelli più nuovi (es. gpt-5), con fallback a Chat Completions
+  const model = args.model || process.env.OPENAI_MODEL || 'gpt-4o'
+  let result: Array<{ name?: string; arguments?: any }> = []
+  
+  // Usa Chat Completions per tutti i modelli gpt-4 (incluso gpt-4o)
+  const isGpt4 = /^gpt-4/i.test(model)
+
+  try {
+    // Per GPT-4 e GPT-4o usa Chat Completions con tools
+    if (isGpt4) {
+      const respCC = await openai.chat.completions.create({
+        model,
+        messages: [
+          { role: 'system', content: system_msg },
+          { role: 'user', content: user_msg }
+        ],
+        tools,
+        tool_choice: 'required',
+        max_tokens: 500,
+        temperature: 0
+      })
+      if (verbose) console.log('🤖 AI - Chat Completions raw (gpt-4):', JSON.stringify(respCC, null, 2))
+      const tcalls = respCC.choices?.[0]?.message?.tool_calls || []
+      console.log('🤖 AI - Tool calls (gpt-4):', tcalls.length)
+      result = tcalls.map((t) => {
+        let parsed: any
+        try { parsed = JSON.parse(t.function?.arguments || '{}') } catch { parsed = {} }
+        const mapped = { name: t.function?.name, arguments: parsed }
+        if (verbose) console.log('🤖 AI - Tool call mappato (chat gpt-4):', mapped)
+        return mapped
+      })
+    } else {
+      // Responses API (consigliata per gpt-5)
+      const resp = await openai.responses.create({
+      model,
+      input: [
+        { role: 'system', content: [{ type: 'text', text: system_msg }] },
+        { role: 'user', content: [{ type: 'text', text: user_msg }] }
+      ],
+      tools: tools as any,
+      tool_choice: 'required' as any,
+      parallel_tool_calls: false,
+      max_output_tokens: 500,
+      temperature: 0
+      } as any)
+      
+      if (verbose) console.log('🤖 AI - Responses API raw:', JSON.stringify(resp, null, 2))
+      const output = (resp as any)?.output || []
+      
+      // Estrazione robusta dei tool calls (diverse forme supportate nei modelli recenti)
+      const collected: any[] = []
+      for (const item of output) {
+        if (item?.type === 'tool_call') collected.push(item)
+        if (item?.type === 'message' && Array.isArray(item.tool_calls)) {
+          for (const tc of item.tool_calls) collected.push(tc)
+        }
+        const content = item?.content
+        if (Array.isArray(content)) {
+          for (const part of content) if (part?.type === 'tool_call') collected.push(part)
+        }
+      }
+      console.log('🤖 AI - Tool calls (responses):', collected.length)
+      if (collected.length > 0) {
+        result = collected.map((tc: any) => {
+          const rawArgs = tc.arguments ?? tc.args ?? tc.input
+          let parsed: any = {}
+          try { parsed = typeof rawArgs === 'string' ? JSON.parse(rawArgs) : rawArgs || {} } catch {}
+          const name = tc.name || tc.tool_name
+          const mapped = { name, arguments: parsed }
+          if (verbose) console.log('🤖 AI - Tool call mappato (responses):', mapped)
+          return mapped
+        })
+      } else {
+        if (verbose) console.log('⚠️ Nessun tool_call in Responses (input). Ritento con messages...')
+        const respAlt = await openai.responses.create({
+          model,
+          messages: [
+            { role: 'system', content: [{ type: 'text', text: system_msg }] },
+            { role: 'user', content: [{ type: 'text', text: user_msg }] }
+          ],
+          tools: tools as any,
+          tool_choice: 'required' as any,
+          parallel_tool_calls: false,
+          max_output_tokens: 500,
+          temperature: 0
+        } as any)
+        if (verbose) console.log('🤖 AI - Responses API raw (messages):', JSON.stringify(respAlt, null, 2))
+        const outputAlt = (respAlt as any)?.output || []
+        const collectedAlt: any[] = []
+        for (const item of outputAlt) {
+          if (item?.type === 'tool_call') collectedAlt.push(item)
+          if (item?.type === 'message' && Array.isArray(item.tool_calls)) {
+            for (const tc of item.tool_calls) collectedAlt.push(tc)
+          }
+          const content = item?.content
+          if (Array.isArray(content)) {
+            for (const part of content) if (part?.type === 'tool_call') collectedAlt.push(part)
+          }
+        }
+        console.log('🤖 AI - Tool calls (responses/messages):', collectedAlt.length)
+        if (collectedAlt.length > 0) {
+          result = collectedAlt.map((tc: any) => {
+            const rawArgs = tc.arguments ?? tc.args ?? tc.input
+            let parsed: any = {}
+            try { parsed = typeof rawArgs === 'string' ? JSON.parse(rawArgs) : rawArgs || {} } catch {}
+            const name = tc.name || tc.tool_name
+            const mapped = { name, arguments: parsed }
+            if (verbose) console.log('🤖 AI - Tool call mappato (responses/messages):', mapped)
+            return mapped
+          })
+        } else {
+          const textMsg = outputAlt.find((o: any) => o?.type === 'message')
+          const text = textMsg?.content?.[0]?.text
+          if (text && verbose) {
+            console.log('⚠️ Responses (messages) ha restituito solo testo invece di tool calls!')
+            console.log('⚠️ Contenuto ricevuto:', text)
+          }
+        }
+      }
+    }
+  } catch (e) {
+    if (verbose) console.log('⚠️ Responses API non disponibile o fallita, uso Chat Completions. Errore:', e instanceof Error ? e.message : e)
+  }
+  
+  if (result.length === 0 && !isGpt4) {
+    // Fallback: Chat Completions tools
+    const respCC = await openai.chat.completions.create({
+      model,
+      messages: [
+        { role: 'system', content: system_msg },
+        { role: 'user', content: user_msg }
+      ],
+      tools,
+      tool_choice: 'required',
+      max_tokens: 500,
+      temperature: 0
+    })
+    if (verbose) console.log('🤖 AI - Chat Completions raw:', JSON.stringify(respCC, null, 2))
+    const tcalls = respCC.choices?.[0]?.message?.tool_calls || []
+    console.log('🤖 AI - Tool calls (chat):', tcalls.length)
+    if (tcalls.length === 0 && respCC.choices?.[0]?.message?.content && verbose) {
+      console.log('⚠️ ChatCompletions ha restituito solo testo invece di tool calls!')
+      console.log('⚠️ Contenuto ricevuto:', respCC.choices?.[0]?.message?.content)
+    }
+    result = tcalls.map((t) => {
+      let parsed: any
+      try { parsed = JSON.parse(t.function?.arguments || '{}') } catch { parsed = {} }
+      const mapped = { name: t.function?.name, arguments: parsed }
+      if (verbose) console.log('🤖 AI - Tool call mappato (chat):', mapped)
+      return mapped
+    })
+  }
+  
+  if (verbose) console.log('🤖 AI - Risultato finale:', JSON.stringify(result, null, 2))
+  return result
 }
 
 

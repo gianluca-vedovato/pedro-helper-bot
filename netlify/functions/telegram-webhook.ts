@@ -137,6 +137,49 @@ function ensureBot() {
       console.log('📊 Aggiornamento sondaggio ricevuto:', { poll_id: poll.id, is_closed: poll.is_closed })
       const results = Object.fromEntries((poll.options || []).map((o: any) => [o.text, o.voter_count]))
       await pollsUpdateResults(poll.id, !!poll.is_closed, results)
+
+      // Se il sondaggio è chiuso, applica automaticamente le decisioni
+      if (poll.is_closed) {
+        try {
+          console.log('🔔 Sondaggio chiuso. Avvio applicazione automatica dei risultati...')
+          const pollRow = await pollsGet(poll.id)
+          if (!pollRow) {
+            console.log('❌ Sondaggio non trovato nel database per auto-applicazione')
+            return
+          }
+
+          const question = (pollRow as any).question || ''
+          let options: string[] = []
+          try { options = JSON.parse((pollRow as any).options_json || '[]') } catch {}
+          let storedResults: Record<string, number> = {}
+          try { storedResults = JSON.parse((pollRow as any).results_json || '{}') } catch {}
+
+          // Se per qualche motivo i risultati nel DB non ci sono ancora, usa quelli dell'update corrente
+          const effectiveResults = Object.keys(storedResults).length ? storedResults : results
+
+          const sorted = Object.entries(effectiveResults).sort((a, b) => (b[1] as number) - (a[1] as number))
+          const winning = sorted.length ? sorted[0][0] : null
+          const summary = sorted.length ? sorted.map(([o, c]) => `${o}: ${c}`).join(', ') : null
+
+          const rules = await rulesGetAll()
+          const rulesText = (rules as any[]).map((r) => `${r.rule_number}. ${r.content}`).join('\n\n')
+
+          const chat_id = (pollRow as any).chat_id as number
+          if (!chat_id) {
+            console.log('❌ chat_id mancante per auto-applicazione')
+            return
+          }
+
+          console.log('🚀 Auto-applico sondaggio chiuso:', { question, options, winning, summary, chat_id })
+          const ctxLike: any = {
+            reply: (text: string, extra?: any) => (bot as Telegraf).telegram.sendMessage(chat_id, text, extra)
+          }
+
+          await applyDecisionFromAI(ctxLike, { question, options, winning, resultsSummary: summary, rulesText })
+        } catch (err) {
+          console.error('❌ Errore durante l\'auto-applicazione del sondaggio:', err)
+        }
+      }
     })
 
     bot.action(/apply:.+/, async (ctx) => {
@@ -277,35 +320,112 @@ async function applyDecisionFromAI(ctx: Context, params: { question: string; opt
   console.log('📚 Regole per AI (primi 200 caratteri):', rules.substring(0, 200) + '...')
   
   try {
+    console.log('🤖 Chiamata AI con parametri:', {
+      question: params.question,
+      options: params.options,
+      winning: params.winning,
+      resultsSummary: params.resultsSummary,
+      rulesLength: rules.length
+    })
+    
     const toolCalls = await decideRuleActionWithTools({
       poll_question: params.question,
       poll_options: params.options,
       winning_option: params.winning,
       poll_result_summary: params.resultsSummary,
-      rules_text: rules
+      rules_text: rules,
+      model: 'gpt-4o'
     })
     
-    console.log('🔧 Tool calls ricevuti dall\'AI:', toolCalls)
+      console.log('🔧 Tool calls:', toolCalls.length)
     
     let action: 'add' | 'update' | 'remove' | null = null
     let rule_number: number | null = null
     let proposed_content: string | null = null
     
+    // Analizza tutti i tool calls per trovare un'azione valida
     for (const call of toolCalls as any[]) {
       const name = call.name
       const args = call.arguments || {}
-      console.log('🔍 Analizzo tool call:', { name, args })
+      // Debug sintetico
+      console.log('🔍 Tool call:', name)
       
-      if (name === 'remove_rule') { action = 'remove'; rule_number = args.rule_number; break }
-      if (name === 'update_rule') { action = 'update'; rule_number = args.rule_number; proposed_content = args.content; break }
-      if (name === 'add_rule') { action = 'add'; rule_number = args.rule_number; proposed_content = args.content; break }
+      if (name === 'remove_rule') { 
+        action = 'remove'; 
+        rule_number = args.rule_number; 
+        console.log('✅ Rimozione rilevata:', { action, rule_number })
+        break 
+      }
+      if (name === 'update_rule') { 
+        action = 'update'; 
+        rule_number = args.rule_number; 
+        proposed_content = args.content; 
+        console.log('✅ Aggiornamento rilevato:', { action, rule_number, proposed_content })
+        break 
+      }
+      if (name === 'add_rule') { 
+        action = 'add'; 
+        rule_number = args.rule_number; 
+        proposed_content = args.content; 
+        console.log('✅ Aggiunta rilevata:', { action, rule_number, proposed_content })
+        break 
+      }
     }
     
-    console.log('🎯 Azione determinata:', { action, rule_number, proposed_content })
+    console.log('🎯 Azione:', action, 'Regola:', rule_number)
     
+    // Se non c'è azione, prova a interpretare il contesto e forzare una decisione
     if (!action) {
-      console.log('❌ Nessuna azione determinata dall\'AI')
-      return (ctx as any).reply('❌ Non sono riuscito a capire l\'azione dal sondaggio. Riformula la domanda o rendi più chiare le opzioni (es. sì/no).')
+      console.log('⚠️ Nessuna azione determinata dall\'AI, attivo sistema di fallback...')
+      
+      const question = params.question.toLowerCase()
+      const winning = params.winning?.toLowerCase() || ''
+      
+      // Log sintetici
+      console.log('🔍 Fallback attivo')
+      
+      // Logica di fallback migliorata
+      const normalizedQuestion = params.question.replace(/\s+/g, ' ').trim()
+      const normalizedWinning = (params.winning || '').replace(/\s+/g, ' ').trim()
+
+      // Heuristics per estrarre limite da winning option
+      const maxMatch = normalizedWinning.toLowerCase().match(/massimo\s+(\d+)/)
+      const minMatch = normalizedWinning.toLowerCase().match(/minimo\s+(\d+)/)
+      const noneMatch = /(nessuno|no)/i.test(normalizedWinning)
+
+      if (/aboliamo|rimuoviamo|cancelliamo/i.test(question) || (/(teniamo|manteniamo)/i.test(question) && noneMatch)) {
+        action = 'remove'
+        // Prova a dedurre numero regola correlata
+        const relevantRules = rules.split('\n').filter((r) => r.toLowerCase().includes(question.split(' ').find((w) => w.length > 3) || ''))
+        if (relevantRules.length > 0) {
+          const firstRule = relevantRules[0]
+          const m = firstRule.match(/^(\d+)\./)
+          if (m) rule_number = parseInt(m[1])
+        }
+        //
+      } else if (/cambiamo|modifichiamo|aggiorniamo/i.test(question)) {
+        action = 'update'
+        proposed_content = `Regola aggiornata in base al sondaggio: ${normalizedQuestion}`
+        //
+      } else {
+        action = 'add'
+        // Genera contenuto testuale coerente
+        const subject = normalizedQuestion.replace(/^quanti\s+/i, '').replace(/^limite\s+agli?\s+/i, '').replace(/\?+$/, '').trim()
+        if (noneMatch) {
+          proposed_content = `Non è consentito ${subject.toLowerCase()}.`
+        } else if (maxMatch) {
+          const n = parseInt(maxMatch[1])
+          proposed_content = `È consentito al massimo ${n} ${subject.toLowerCase()}.`
+        } else if (minMatch) {
+          const n = parseInt(minMatch[1])
+          proposed_content = `È obbligatorio avere almeno ${n} ${subject.toLowerCase()}.`
+        } else {
+          // fallback minimale
+          proposed_content = `Nuova regola: ${normalizedQuestion} — Decisione: ${normalizedWinning || 'approvata'}.`
+        }
+        //
+      }
+      console.log('🎯 Fallback → Azione:', action)
     }
 
     if (action === 'remove') {
@@ -317,16 +437,24 @@ async function applyDecisionFromAI(ctx: Context, params: { question: string; opt
     }
 
     if (rule_number == null && action === 'add') rule_number = await rulesNextNumber()
+    
+    // Controllo finale per proposed_content
+    if (!proposed_content && (action === 'add' || action === 'update')) {
+      console.log('⚠️ proposed_content ancora null, creo contenuto di fallback...')
+      proposed_content = `Regola creata dal sondaggio: ${params.question}`
+    }
+    
+    console.log('💾 Salvataggio regola…')
+    
     if (!proposed_content) return (ctx as any).reply('❌ Nessun contenuto proposto trovato. Rendi più chiara la domanda/risposta.')
     
     console.log('💾 Salvo regola:', { rule_number, proposed_content })
+    const existedBefore = await ruleExists(rule_number as number)
     const ok = await rulesUpsert(rule_number as number, proposed_content)
     if (!ok) return (ctx as any).reply('❌ Errore durante il salvataggio della regola.')
-    
-    const existed = await ruleExists(rule_number as number)
-    const verb = existed ? 'aggiornata' : 'aggiunta'
+    const verb = existedBefore ? 'aggiornata' : 'aggiunta'
     await (ctx as any).reply(`✅ Regola ${rule_number} ${verb} con successo.`)
-    if (existed) await (ctx as any).reply(`📋 Regola ${rule_number} aggiornata:\n\n${proposed_content}`, { parse_mode: 'Markdown' })
+    if (existedBefore) await (ctx as any).reply(`📋 Regola ${rule_number} aggiornata:\n\n${proposed_content}`, { parse_mode: 'Markdown' })
     else await (ctx as any).reply(`📋 Nuova regola ${rule_number}:\n\n${proposed_content}`, { parse_mode: 'Markdown' })
     
   } catch (error) {
