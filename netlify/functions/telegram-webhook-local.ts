@@ -1,6 +1,6 @@
 import 'dotenv/config'
 import http from 'http'
-import { handler } from './telegram-webhook'
+import handler from './telegram-webhook'
 
 const port = Number(process.env.PORT || 8787)
 const server = http.createServer(async (req, res) => {
@@ -11,9 +11,17 @@ const server = http.createServer(async (req, res) => {
   let body = ''
   req.on('data', (chunk) => (body += chunk))
   req.on('end', async () => {
-    const result = await handler({ body })
-    res.writeHead(result.statusCode || 200, { 'content-type': 'application/json' })
-    res.end(result.body || '{}')
+    try {
+      const result = await handler({ body, method: 'POST', url: req.url }, res)
+      if (result) {
+        res.writeHead(200, { 'content-type': 'application/json' })
+        res.end(JSON.stringify(result))
+      }
+    } catch (error) {
+      console.error('Error in local handler:', error)
+      res.writeHead(500, { 'content-type': 'application/json' })
+      res.end(JSON.stringify({ error: 'Internal server error' }))
+    }
   })
 })
 

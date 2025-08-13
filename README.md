@@ -1,86 +1,90 @@
-# Pedro Bot (Node.js)
+# Pedro Bot - Node.js Version
 
-Bot Telegram per la gestione di regole e sondaggi, costruito con Node.js e TypeScript.
+Bot Telegram per Fantacalcio costruito con Node.js e TypeScript, deployato su Netlify Functions.
 
-## 🏗️ Struttura del Progetto
+## 🚀 Funzionalità
+
+- Bot Telegram per gestione regolamento Fantacalcio
+- Integrazione con OpenAI per risposte intelligenti
+- Database Supabase per persistenza dati
+- Sistema di promemoria per i gruppi
+- Deploy automatico su Netlify
+
+## 🛠️ Tecnologie
+
+- **Runtime**: Node.js 18+
+- **Language**: TypeScript
+- **Framework**: Telegraf per Telegram Bot API
+- **Database**: Supabase
+- **AI**: OpenAI API
+- **Deploy**: Netlify Functions
+
+## 📁 Struttura Progetto
 
 ```
-pedro/
-├── netlify/
-│   └── functions/          # Funzioni Netlify (TypeScript)
-│       ├── telegram-webhook.ts      # Webhook principale del bot
-│       ├── telegram-webhook-local.ts # Versione locale per test
-│       ├── status-check.ts          # Controllo stato
-│       └── keep-alive.ts            # Mantenimento attivo
-├── src/
-│   └── services/           # Servizi core
-│       ├── ai.ts           # Integrazione AI
-│       └── db.ts           # Database operations
-└── package.json
+netlify/
+├── functions/
+│   ├── telegram-webhook.ts      # Webhook principale per Telegram
+│   ├── telegram-webhook-local.ts # Versione locale per sviluppo
+│   └── services/
+│       ├── ai.ts               # Servizio OpenAI
+│       └── db.ts               # Servizio database Supabase
 ```
 
-## 🚀 Sviluppo Locale
+## 🚀 Setup Locale
 
-### Prerequisiti
-- Node.js >= 18
-- npm
+1. **Installa dipendenze**:
+   ```bash
+   npm install
+   ```
 
-### Installazione
-```bash
-npm install
-```
+2. **Configura variabili ambiente**:
+   Crea un file `.env` con:
+   ```
+   TELEGRAM_BOT_TOKEN=your_bot_token
+   OPENAI_API_KEY=your_openai_key
+   SUPABASE_URL=your_supabase_url
+   SUPABASE_ANON_KEY=your_supabase_anon_key
+   ```
 
-### Test Locale
-```bash
-npm start
-```
-
-### Build delle Funzioni
-```bash
-npm run build:functions
-```
-
-### Type Checking
-```bash
-npm run typecheck
-```
+3. **Avvia in locale**:
+   ```bash
+   npm start
+   ```
 
 ## 🌐 Deploy su Netlify
 
-Il progetto è configurato per compilare automaticamente i file TypeScript durante il deploy:
+1. **Connetti il repository** a Netlify
+2. **Configura le variabili ambiente** nel dashboard Netlify
+3. **Deploy automatico** ad ogni push su main
 
-1. **Build automatico**: Netlify compila i file `.ts` in `.js` usando esbuild
-2. **Nessun file duplicato**: Solo i file TypeScript vengono committati
-3. **Deploy pulito**: I file compilati vengono generati automaticamente
+## 📝 Comandi Disponibili
 
-### Variabili d'Ambiente
-Configura in Netlify:
-- `BOT_TOKEN` - Token del bot Telegram
-- `OPENAI_API_KEY` - Chiave API OpenAI
-- `SUPABASE_URL` - URL Supabase
-- `SUPABASE_ANON_KEY` - Chiave anonima Supabase
-
-## 📝 Comandi del Bot
-
-- `/start` - Avvio bot
-- `/help` - Aiuto
-- `/regolamento [n]` - Visualizza regole
+- `/start` - Avvia il bot
+- `/help` - Mostra aiuto
+- `/regolamento [n]` - Visualizza regole (specifica o tutte)
 - `/askpedro [domanda]` - Chiedi al bot
-- `/applica_sondaggio` - Applica risultati sondaggio
-- `/promemoria` - Gestione promemoria
+- `/promemoria <testo>` - Salva un promemoria
+- `/promemoria_lista` - Lista tutti i promemoria
+- `/promemoria_cancella <id>` - Cancella un promemoria
 
-## 🔧 Workflow di Sviluppo
+## 📝 Script Disponibili
 
-1. **Modifica** i file `.ts` in `netlify/functions/`
-2. **Testa localmente** con `npm start`
-3. **Commit** solo i file TypeScript
-4. **Deploy** su Netlify (compilazione automatica)
+- `npm start` - Avvia il bot in locale
+- `npm run build` - Controlla i tipi TypeScript
+- `npm run lint` - Esegue ESLint
+- `npm run typecheck` - Controlla i tipi
 
-## 📚 Tecnologie
+## 🔧 Configurazione
 
-- **Runtime**: Node.js
-- **Language**: TypeScript
-- **Framework**: Telegraf (Telegram Bot API)
-- **AI**: OpenAI GPT
-- **Database**: Supabase
-- **Deploy**: Netlify Functions 
+Il progetto usa:
+- **ESLint** per linting del codice
+- **TypeScript** per type checking
+- **Netlify Functions** per il deploy serverless
+- **esbuild** per la compilazione automatica
+
+## 📚 Documentazione
+
+- [Netlify Functions](https://docs.netlify.com/functions/overview/)
+- [Telegraf](https://telegraf.js.org/)
+- [Supabase](https://supabase.com/docs) 

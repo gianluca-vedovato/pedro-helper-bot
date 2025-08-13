@@ -1,8 +1,0 @@
-# Requirements minimali per Render
-# Solo le dipendenze essenziali
-
-python-telegram-bot
-openai
-python-dotenv
-supabase
-psycopg2-binary

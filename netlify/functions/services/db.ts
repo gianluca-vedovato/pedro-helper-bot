@@ -57,44 +57,41 @@ export async function rulesDelete(rule_number: number): Promise<boolean> {
   return !error
 }
 
-export async function pollsUpsert(meta: {
+
+// Polls storage (snapshot)
+export type StoredPoll = {
   poll_id: string
   chat_id: number
   message_id: number
-  creator_user_id?: number
-  question?: string
-  options?: string[]
-}) {
-  const client = getSupabase()
-  if (!client) return
-  const { poll_id, chat_id, message_id, creator_user_id, question, options } = meta
-  await client
-    .from('polls')
-    .upsert({
-      poll_id,
-      chat_id,
-      message_id,
-      creator_user_id,
-      question,
-      options_json: JSON.stringify(options || []),
-    })
+  question: string
+  options: { text: string; voter_count: number }[]
+  is_closed: boolean
 }
 
-export async function pollsUpdateResults(poll_id: string, is_closed: boolean, results: Record<string, number>) {
+export async function pollsUpsert(poll: StoredPoll): Promise<boolean> {
   const client = getSupabase()
-  if (!client) return
-  await client
+  if (!client) return false
+  const { error } = await client
     .from('polls')
-    .update({ is_closed: is_closed ? 1 : 0, results_json: JSON.stringify(results || {}) })
-    .eq('poll_id', poll_id)
+    .upsert(
+      {
+        poll_id: poll.poll_id,
+        chat_id: poll.chat_id,
+        message_id: poll.message_id,
+        question: poll.question,
+        options: poll.options,
+        is_closed: poll.is_closed
+      },
+      { onConflict: 'poll_id' }
+    )
+  return !error
 }
 
-export async function pollsGet(poll_id: string) {
+export async function pollGetById(poll_id: string): Promise<StoredPoll | null> {
   const client = getSupabase()
   if (!client) return null
-  const { data, error } = await client.from('polls').select('*').eq('poll_id', poll_id).single()
-  if (error) return null
-  return data
+  const { data } = await client.from('polls').select('*').eq('poll_id', poll_id).limit(1)
+  return (data && (data[0] as any)) || null
 }
 
 
