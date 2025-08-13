@@ -1,9 +1,10 @@
 [functions]
-  directory = "dist/netlify/functions"
+  # Usa direttamente la sorgente TypeScript; Netlify compila con esbuild
+  directory = "netlify/functions"
   node_bundler = "esbuild"
 
 [build]
-  command = "npm run build:functions"
+  # Nessun build custom necessario per le Functions; esbuild gestisce TS automaticamente
   publish = "."
 
 [functions."telegram-webhook"]
