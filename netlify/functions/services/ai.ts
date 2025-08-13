@@ -94,6 +94,12 @@ export async function decideRuleActionWithTools(args: {
       }
     }
   ]
+  // Duplico le definizioni come "functions" per massima compatibilità con Chat Completions
+  const functionsDef: any[] = [
+    { name: 'add_rule', description: 'Aggiungi una nuova regola (se non esiste già una regola sullo stesso tema).', parameters: addSchema },
+    { name: 'update_rule', description: 'Aggiorna una regola esistente con un nuovo testo completo (sostitutivo).', parameters: updateSchema },
+    { name: 'remove_rule', description: 'Rimuovi una regola esistente.', parameters: removeSchema }
+  ]
   const system_msg = `Sei un assistente per la gestione di regolamenti del fantacalcio. DEVI rispondere SOLO usando una delle funzioni (add_rule, update_rule, remove_rule). Non fornire MAI testo libero.
 
 Quando ricevi un sondaggio, devi:
@@ -156,8 +162,30 @@ ${args.rules_text}
   const isGpt4 = /^gpt-4/i.test(model)
 
   try {
-    // Per GPT-4 e GPT-4o usa Chat Completions con tools
+    // 1) Primo tentativo: Chat Completions con functions (function_call:required su funzione determinata dal modello)
     if (isGpt4) {
+      const respFunc = await openai.chat.completions.create({
+        model,
+        messages: [
+          { role: 'system', content: system_msg },
+          { role: 'user', content: user_msg }
+        ],
+        functions: functionsDef as any,
+        function_call: 'auto' as any,
+        max_tokens: 400,
+        temperature: 0
+      } as any)
+      if (verbose) console.log('🤖 AI - Chat Completions raw (functions):', JSON.stringify(respFunc, null, 2))
+      const fc = respFunc.choices?.[0]?.message?.function_call as any
+      if (fc?.name) {
+        let parsedArgs: any = {}
+        try { parsedArgs = fc.arguments ? JSON.parse(fc.arguments) : {} } catch {}
+        const mapped = [{ name: fc.name, arguments: parsedArgs }]
+        console.log('🤖 AI - Function call (functions):', mapped.length)
+        return mapped
+      }
+
+      // 2) Secondo tentativo: Chat Completions con tools (tool_choice:required)
       const respCC = await openai.chat.completions.create({
         model,
         messages: [
@@ -166,7 +194,7 @@ ${args.rules_text}
         ],
         tools,
         tool_choice: 'required',
-        max_tokens: 500,
+        max_tokens: 400,
         temperature: 0
       })
       if (verbose) console.log('🤖 AI - Chat Completions raw (gpt-4):', JSON.stringify(respCC, null, 2))
@@ -180,7 +208,7 @@ ${args.rules_text}
         return mapped
       })
     } else {
-      // Responses API (consigliata per gpt-5)
+      // 3) Responses API (modelli più nuovi)
       const resp = await openai.responses.create({
       model,
       input: [
@@ -188,7 +216,7 @@ ${args.rules_text}
         { role: 'user', content: [{ type: 'text', text: user_msg }] }
       ],
       tools: tools as any,
-      tool_choice: 'required' as any,
+        tool_choice: 'required' as any,
       parallel_tool_calls: false,
       max_output_tokens: 500,
       temperature: 0
