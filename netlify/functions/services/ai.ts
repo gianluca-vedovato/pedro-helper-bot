@@ -21,7 +21,7 @@ export async function askAboutRules(question: string, rulesText: string): Promis
         content: `Regolamento:\n${rulesText}\n\nDomanda: ${question}`
       }
     ],
-    max_tokens: 500
+    max_completion_tokens: 500
   })
   return resp.choices?.[0]?.message?.content?.trim() || 'Errore nella risposta.'
 }
