@@ -8,22 +8,41 @@ function getClient(): OpenAI {
 }
 
 export async function askAboutRules(question: string, rulesText: string): Promise<string> {
-  const openai = getClient()
-  const resp = await openai.chat.completions.create({
-    model: process.env.OPENAI_MODEL || 'gpt-4o',
-    messages: [
-      {
-        role: 'system',
-        content: `Sei un assistente esperto di fantacalcio. Rispondi alle domande basandoti sul regolamento fornito. Sii chiaro, conciso e utile.`
-      },
-      {
-        role: 'user',
-        content: `Regolamento:\n${rulesText}\n\nDomanda: ${question}`
-      }
-    ],
-    max_completion_tokens: 500
-  })
-  return resp.choices?.[0]?.message?.content?.trim() || 'Errore nella risposta.'
+  try {
+    console.log('🤖 AI: Chiamata askAboutRules per domanda:', question)
+    console.log('🤖 AI: Regole disponibili:', rulesText ? 'Sì' : 'No')
+    
+    const openai = getClient()
+    const model = process.env.OPENAI_MODEL || 'gpt-5'
+    console.log('🤖 AI: Modello utilizzato:', model)
+    
+    const resp = await openai.chat.completions.create({
+      model,
+      messages: [
+        {
+          role: 'system',
+          content: `Sei un assistente esperto di fantacalcio. Rispondi alle domande basandoti sul regolamento fornito. Sii chiaro, conciso e utile.`
+        },
+        {
+          role: 'user',
+          content: `Regolamento:\n${rulesText}\n\nDomanda: ${question}`
+        }
+      ],
+      max_completion_tokens: 500
+    })
+    
+    const content = resp.choices?.[0]?.message?.content?.trim()
+    if (content) {
+      console.log('✅ AI: Risposta generata con successo')
+      return content
+    } else {
+      console.error('❌ AI: Nessuna risposta generata da OpenAI')
+      return '❌ Non sono riuscito a generare una risposta. Riprova più tardi.'
+    }
+  } catch (error) {
+    console.error('❌ AI: Errore in askAboutRules:', error)
+    return `❌ Errore nella generazione della risposta: ${error instanceof Error ? error.message : 'Errore sconosciuto'}`
+  }
 }
 
 export type PollOptionSnapshot = { text: string; voter_count: number }
@@ -97,7 +116,7 @@ export async function applyPollToRules(params: {
   ].join('\n')
 
   const completion = await openai.chat.completions.create({
-    model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
+    model: process.env.OPENAI_MODEL || 'gpt-5',
     messages: [
       {
         role: 'system',
