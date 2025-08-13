@@ -250,35 +250,54 @@ function extractPollIdFromText(text: string): string | '' {
   return (m && m[1]) || ''
 }
 
-export default async function handler(req: any, res: any) {
+export async function handler(event: any) {
   try {
-    console.log('🚀 Webhook ricevuto:', req.method, req.url)
-    
-    if (req.method === 'POST') {
+    const method = event?.httpMethod || event?.method || (event?.body ? 'POST' : 'GET')
+    const url = event?.rawUrl || event?.path || ''
+    console.log('🚀 Webhook ricevuto:', method, url)
+
+    if (method === 'POST') {
       const bot = ensureBot()
       if (!bot) {
         console.error('❌ Bot non inizializzato')
-        return res.status(500).json({ error: 'Bot non inizializzato' })
+        return {
+          statusCode: 500,
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ error: 'Bot non inizializzato' })
+        }
       }
 
-      const update = req.body
+      const rawBody = event?.body
+      const update = typeof rawBody === 'string' ? safeJsonParse(rawBody) : rawBody
       console.log('📨 Update ricevuto:', update?.update_id ? `ID: ${update.update_id}` : 'No ID')
-      
+
       await bot.handleUpdate(update)
       console.log('✅ Update gestito con successo')
-      
-      return res.status(200).json({ ok: true })
+
+      return { statusCode: 200, headers: { 'content-type': 'application/json' }, body: JSON.stringify({ ok: true }) }
     } else {
       console.log('ℹ️ Richiesta GET ricevuta')
-      return res.status(200).json({ 
-        status: 'Bot attivo',
-        timestamp: new Date().toISOString(),
+      return {
+        statusCode: 200,
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          status: 'Bot attivo',
+          timestamp: new Date().toISOString(),
           commands: ['/start', '/help', '/regolamento', '/askpedro', '/promemoria', '/promemoria_lista', '/promemoria_cancella', '/applica_sondaggio']
-      })
+        })
+      }
     }
   } catch (error) {
     console.error('❌ Errore nel webhook:', error)
-    return res.status(500).json({ error: 'Errore interno del server' })
+    return { statusCode: 500, headers: { 'content-type': 'application/json' }, body: JSON.stringify({ error: 'Errore interno del server' }) }
+  }
+}
+
+function safeJsonParse(body: string): any {
+  try {
+    return JSON.parse(body)
+  } catch {
+    return {}
   }
 }
 
