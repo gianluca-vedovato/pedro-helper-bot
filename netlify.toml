@@ -3,7 +3,20 @@
   node_bundler = "esbuild"
 
 [build]
-  command = "npm ci"
+  command = "npm run build:functions"
   publish = "."
+
+[functions."telegram-webhook"]
+  node_bundler = "esbuild"
+  external_node_modules = ["@supabase/supabase-js"]
+
+[functions."telegram-webhook-local"]
+  node_bundler = "esbuild"
+
+[functions."status-check"]
+  node_bundler = "esbuild"
+
+[functions."keep-alive"]
+  node_bundler = "esbuild"
 
 

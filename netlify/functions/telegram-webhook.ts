@@ -63,7 +63,7 @@ function ensureBot() {
       if (!rules.length) return ctx.reply('❌ Nessuna regola caricata.')
       const rulesText = (rules as any[]).map((r) => `${r.rule_number}. ${r.content}`).join('\n\n')
       const answer = await askAboutRules(q, rulesText)
-      await ctx.reply(`🤖 Pedro dice:\n\n${answer}`, { parse_mode: 'Markdown' })
+      await ctx.reply(answer, { parse_mode: 'Markdown' })
     })
 
     bot.command('promemoria', async (ctx) => {

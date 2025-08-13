@@ -7,13 +7,15 @@
     "node": ">=18"
   },
   "scripts": {
-    "start": "node netlify/functions/telegram-webhook-local.js",
+    "start": "tsx netlify/functions/telegram-webhook-local.ts",
+    "build:functions": "rm -f netlify/functions/*.js && tsc netlify/functions/*.ts --target es2020 --module esnext --moduleResolution node --esModuleInterop --allowSyntheticDefaultImports --skipLibCheck --noEmitOnError",
     "lint": "eslint \"**/*.{ts,js}\"",
     "typecheck": "tsc --noEmit",
     "check-webhook": "node check_webhook.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",
+    "dotenv": "^17.2.1",
     "openai": "^4.52.0",
     "telegraf": "^4.16.3"
   },
@@ -21,7 +23,7 @@
     "@typescript-eslint/eslint-plugin": "^8.5.0",
     "@typescript-eslint/parser": "^8.5.0",
     "eslint": "^9.9.0",
+    "tsx": "^4.20.4",
     "typescript": "^5.6.2"
   }
 }
-

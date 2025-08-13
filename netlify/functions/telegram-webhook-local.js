@@ -1,24 +1,25 @@
-// Simple local runner to test the function without Netlify
-import http from "http";
-import { handler } from "./telegram-webhook.js";
-
-const port = process.env.PORT || 8787;
+import 'dotenv/config';
+import http from 'http';
+import { handler } from './telegram-webhook';
+const port = Number(process.env.PORT || 8787);
 const server = http.createServer(async (req, res) => {
-  if (req.method !== "POST") {
-    res.writeHead(200, { "content-type": "text/plain" });
-    return res.end("ok");
-  }
-  let body = "";
-  req.on("data", (chunk) => (body += chunk));
-  req.on("end", async () => {
-    const result = await handler({ body });
-    res.writeHead(result.statusCode || 200, {
-      "content-type": "application/json",
+    if (req.method !== 'POST') {
+        res.writeHead(200, { 'content-type': 'text/plain' });
+        return res.end('ok');
+    }
+    let body = '';
+    req.on('data', (chunk) => (body += chunk));
+    req.on('end', async () => {
+        const result = await handler({ body });
+        res.writeHead(result.statusCode || 200, { 'content-type': 'application/json' });
+        res.end(result.body || '{}');
     });
-    res.end(result.body || "{}");
-  });
 });
-
 server.listen(port, () => {
-  console.log(`Local webhook listening on http://localhost:${port}`);
+    console.log(`Local webhook listening on http://localhost:${port}`);
+    console.log('Environment variables loaded:', {
+        BOT_TOKEN: process.env.BOT_TOKEN ? '✅ Set' : '❌ Missing',
+        OPENAI_API_KEY: process.env.OPENAI_API_KEY ? '✅ Set' : '❌ Missing',
+        SUPABASE_URL: process.env.SUPABASE_URL ? '✅ Set' : '❌ Missing'
+    });
 });
