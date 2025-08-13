@@ -319,6 +319,49 @@ async function applyDecisionFromAI(ctx: Context, params: { question: string; opt
   const rules = params.rulesText || (await rulesGetAll()).map((r: any) => `${r.rule_number}. ${r.content}`).join('\n\n')
   console.log('📚 Regole per AI (primi 200 caratteri):', rules.substring(0, 200) + '...')
   
+  // Fallback immediato senza AI se richiesto da env (debug/affidabilità)
+  const applyWithoutAI = `${process.env.APPLY_WITHOUT_AI || ''}`.toLowerCase()
+  if (applyWithoutAI === '1' || applyWithoutAI === 'true') {
+    console.log('🧩 APPLY_WITHOUT_AI attivo: applicazione regola con heuristics')
+    let action: 'add' | 'update' | 'remove' = 'add'
+    let rule_number: number | null = null
+    let proposed_content: string | null = null
+    const normalizedQuestion = params.question.replace(/\s+/g, ' ').trim()
+    const normalizedWinning = (params.winning || '').replace(/\s+/g, ' ').trim()
+    const maxMatch = normalizedWinning.toLowerCase().match(/(massimo|max|limite|\b([0-9]{1,2})\b)/)
+    const noneMatch = /(nessuno|no)/i.test(normalizedWinning)
+    const subject = normalizedQuestion
+      .replace(/^quanti\s+/i, '')
+      .replace(/^quante\s+/i, '')
+      .replace(/^aggiungiamo\s+/i, '')
+      .replace(/^limite\s+agli?\s+/i, '')
+      .replace(/\?+$/, '')
+      .trim()
+    if (noneMatch) {
+      proposed_content = `Non è consentito ${subject.toLowerCase()}.`
+    } else {
+      const numberMatch = normalizedWinning.match(/\b(\d{1,2})\b/)
+      if (numberMatch) {
+        const n = parseInt(numberMatch[1])
+        proposed_content = `È consentito al massimo ${n} ${subject.toLowerCase()}.`
+      } else if (maxMatch) {
+        proposed_content = `È introdotto un limite relativo a: ${subject.toLowerCase()} (decisione: ${normalizedWinning}).`
+      } else {
+        proposed_content = `Nuova regola: ${normalizedQuestion} — Decisione: ${normalizedWinning || 'approvata'}.`
+      }
+    }
+    if (rule_number == null) rule_number = await rulesNextNumber()
+    console.log('💾 Salvo regola (no-AI):', { rule_number, proposed_content })
+    const existedBefore = await ruleExists(rule_number as number)
+    const ok = await rulesUpsert(rule_number as number, proposed_content as string)
+    if (!ok) return (ctx as any).reply('❌ Errore durante il salvataggio della regola.')
+    const verb = existedBefore ? 'aggiornata' : 'aggiunta'
+    await (ctx as any).reply(`✅ Regola ${rule_number} ${verb} con successo.`)
+    if (existedBefore) await (ctx as any).reply(`📋 Regola ${rule_number} aggiornata:\n\n${proposed_content}`, { parse_mode: 'Markdown' })
+    else await (ctx as any).reply(`📋 Nuova regola ${rule_number}:\n\n${proposed_content}`, { parse_mode: 'Markdown' })
+    return
+  }
+
   try {
     console.log('🤖 Chiamata AI con parametri:', {
       question: params.question,

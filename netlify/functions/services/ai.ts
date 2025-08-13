@@ -94,7 +94,7 @@ export async function decideRuleActionWithTools(args: {
       }
     }
   ]
-  const system_msg = `Sei un assistente per la gestione di regolamenti del fantacalcio. Il tuo compito è quello di leggere i sondaggi dei partecipanti che servono a cambiare regole e aggiornare il regolamento di conseguenza.
+  const system_msg = `Sei un assistente per la gestione di regolamenti del fantacalcio. DEVI rispondere SOLO usando una delle funzioni (add_rule, update_rule, remove_rule). Non fornire MAI testo libero.
 
 Quando ricevi un sondaggio, devi:
 1. Analizzare la domanda e le opzioni
@@ -112,10 +112,15 @@ Esempi di come interpretare i sondaggi:
 - "Aboliamo la regola sui bonus?" con voto "sì" → remove_rule per rimuovere la regola esistente
 - "Cambiamo il bonus gol da 3 a 5 punti?" → update_rule per modificare la regola esistente
 
-Il tuo obiettivo è rendere il regolamento sempre più chiaro e completo, seguendo le decisioni dei partecipanti.
+ Il tuo obiettivo è rendere il regolamento sempre più chiaro e completo, seguendo le decisioni dei partecipanti.
 
-IMPORTANTE: Non rispondere mai con testo libero. Devi SEMPRE chiamare ESATTAMENTE UNA delle funzioni disponibili (add_rule, update_rule o remove_rule). Se non sei sicuro, preferisci add_rule.`
-  const user_msg = `Ecco un sondaggio da analizzare:
+ Regole di output:
+ - Chiama ESATTAMENTE UNA funzione tra: add_rule, update_rule, remove_rule
+ - Se il quesito riguarda introdurre un limite numerico, usa add_rule con content testuale completo
+ - Se si chiede di abolire una regola, usa remove_rule con il rule_number se disponibile
+ - Se si chiede di modificare una regola esistente, usa update_rule
+ - Se incerto, scegli add_rule con un content ragionevole basato su domanda/opzione vincente`
+  const user_msg = `Analizza il seguente sondaggio e decidi come aggiornare il regolamento. NON restituire testo libero: usa una sola funzione (add_rule, update_rule o remove_rule).
 
 Domanda: ${args.poll_question}
 Opzioni disponibili: ${(args.poll_options || []).join(', ')}
@@ -125,7 +130,11 @@ Risultati completi: ${args.poll_result_summary || 'n.d.'}
 Regolamento attuale:
 ${args.rules_text}
 
-Analizza questo sondaggio e decidi come aggiornare il regolamento. Usa una delle funzioni disponibili per implementare la decisione dei partecipanti.`
+ Linee guida:
+ - Se l'opzione vincente contiene un numero (es. "massimo 2" o "1"), crea una nuova regola descrittiva con quel limite
+ - Se la domanda contiene parole come "aboliamo", usa remove_rule
+ - Se contiene "modifichiamo", "aggiorniamo", usa update_rule
+ - Altrimenti, preferisci add_rule con content ben scritto`
   const openai = getClient()
   
   console.log('🤖 AI - Parametri ricevuti:', {
