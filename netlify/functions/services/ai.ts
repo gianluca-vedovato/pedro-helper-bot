@@ -37,11 +37,11 @@ export async function askAboutRules(question: string, rulesText: string): Promis
       return content
     } else {
       console.error('❌ AI: Nessuna risposta generata da OpenAI')
-      return '❌ Non sono riuscito a generare una risposta. Riprova più tardi.'
+      return '❌ Non sono riuscito a generare una risposta. Assicurati di chiedere solo domande relative al regolamento fantacalcio.'
     }
   } catch (error) {
     console.error('❌ AI: Errore in askAboutRules:', error)
-    return `❌ Errore nella generazione della risposta: ${error instanceof Error ? error.message : 'Errore sconosciuto'}`
+    return `❌ Errore nella generazione della risposta: ${error instanceof Error ? error.message : 'Errore sconosciuto'}. Assicurati di chiedere solo domande relative al regolamento fantacalcio.`
   }
 }
 
