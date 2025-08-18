@@ -1,7 +1,7 @@
 import { Telegraf } from 'telegraf'
 import type { Context } from 'telegraf'
 import { askAboutRules, applyPollToRules } from './services/ai'
-import { getSupabase, rulesGetAll } from './services/db'
+import { getSupabase, rulesGetAll, rulesUpsert, rulesDelete } from './services/db'
 import { pollsUpsert, pollGetById } from './services/db'
 
 const BOT_TOKEN = process.env.BOT_TOKEN
@@ -21,12 +21,12 @@ function ensureBot() {
 
     bot.start(async (ctx) => {
       console.log('🚀 Comando /start ricevuto')
-      await ctx.reply('Ciao! Sono Pedro (Node). Comandi:\n/regolamento [n]\n/askpedro [domanda]\n/promemoria, /promemoria_lista, /promemoria_cancella')
+      await ctx.reply('Ciao! Sono Pedro (Node). Comandi:\n/regolamento [n]\n/askpedro [domanda]\n/promemoria, /promemoria_lista, /promemoria_cancella\n/crea_regola, /cancella_regola')
     })
 
     bot.help(async (ctx) => {
       console.log('❓ Comando /help ricevuto')
-      await ctx.reply('Comandi:\n/start\n/help\n/regolamento [numero]\n/askpedro [domanda]\n/promemoria <testo>\n/promemoria_lista\n/promemoria_cancella <id>')
+      await ctx.reply('Comandi:\n/start\n/help\n/regolamento [numero]\n/askpedro [domanda]\n/promemoria <testo>\n/promemoria_lista\n/promemoria_cancella <id>\n/crea_regola <numero> <contenuto>\n/cancella_regola <numero>')
     })
 
     bot.command('regolamento', async (ctx) => {
@@ -94,6 +94,79 @@ function ensureBot() {
       const { error } = await supabase.from('reminders').delete().eq('id', arg).eq('chat_id', chat_id)
       if (error) return ctx.reply('❌ Errore nella cancellazione del promemoria.')
       return ctx.reply('✅ Promemoria cancellato.')
+    })
+
+    bot.command('crea_regola', async (ctx) => {
+      console.log('📝 Comando /crea_regola ricevuto')
+      const args = (ctx.message?.text || '').split(' ').slice(1)
+      if (args.length < 2) {
+        return ctx.reply('❌ Uso: /crea_regola <numero> <contenuto>\n\nEsempio:\n/crea_regola 1 "La squadra deve avere 25 giocatori"')
+      }
+      
+      const ruleNumber = Number(args[0])
+      const content = args.slice(1).join(' ')
+      
+      if (!Number.isInteger(ruleNumber) || ruleNumber <= 0) {
+        return ctx.reply('❌ Il numero della regola deve essere un numero intero positivo.')
+      }
+      
+      if (content.length < 5) {
+        return ctx.reply('❌ Il contenuto della regola deve essere di almeno 5 caratteri.')
+      }
+      
+      const chatId = ctx.chat?.id as number
+      const userId = ctx.from?.id as number
+      const isAdmin = await userIsAdmin(ctx, chatId, userId)
+      
+      if (!isAdmin) {
+        return ctx.reply('❌ Solo gli amministratori possono creare regole.')
+      }
+      
+      try {
+        const success = await rulesUpsert(ruleNumber, content)
+        if (success) {
+          return ctx.reply(`✅ Regola ${ruleNumber} creata/aggiornata con successo!\n\n📋 Contenuto:\n${content}`)
+        } else {
+          return ctx.reply('❌ Errore durante il salvataggio della regola.')
+        }
+      } catch (error) {
+        console.error('Errore creazione regola:', error)
+        return ctx.reply('❌ Errore interno durante la creazione della regola.')
+      }
+    })
+
+    bot.command('cancella_regola', async (ctx) => {
+      console.log('🗑️ Comando /cancella_regola ricevuto')
+      const arg = (ctx.message?.text || '').split(' ').slice(1)[0]
+      
+      if (!arg) {
+        return ctx.reply('❌ Uso: /cancella_regola <numero>\n\nEsempio:\n/cancella_regola 5')
+      }
+      
+      const ruleNumber = Number(arg)
+      if (!Number.isInteger(ruleNumber) || ruleNumber <= 0) {
+        return ctx.reply('❌ Il numero della regola deve essere un numero intero positivo.')
+      }
+      
+      const chatId = ctx.chat?.id as number
+      const userId = ctx.from?.id as number
+      const isAdmin = await userIsAdmin(ctx, chatId, userId)
+      
+      if (!isAdmin) {
+        return ctx.reply('❌ Solo gli amministratori possono cancellare regole.')
+      }
+      
+      try {
+        const success = await rulesDelete(ruleNumber)
+        if (success) {
+          return ctx.reply(`✅ Regola ${ruleNumber} cancellata con successo!`)
+        } else {
+          return ctx.reply('❌ Errore durante la cancellazione della regola.')
+        }
+      } catch (error) {
+        console.error('Errore cancellazione regola:', error)
+        return ctx.reply('❌ Errore interno durante la cancellazione della regola.')
+      }
     })
 
 
@@ -297,7 +370,7 @@ export async function handler(event: any) {
         body: JSON.stringify({
           status: 'Bot attivo',
           timestamp: new Date().toISOString(),
-          commands: ['/start', '/help', '/regolamento', '/askpedro', '/promemoria', '/promemoria_lista', '/promemoria_cancella', '/applica_sondaggio']
+          commands: ['/start', '/help', '/regolamento', '/askpedro', '/promemoria', '/promemoria_lista', '/promemoria_cancella', '/crea_regola', '/cancella_regola', '/applica_sondaggio']
         })
       }
     }

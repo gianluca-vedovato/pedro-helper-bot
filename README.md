@@ -67,6 +67,10 @@ netlify/
 - `/promemoria <testo>` - Salva un promemoria
 - `/promemoria_lista` - Lista tutti i promemoria
 - `/promemoria_cancella <id>` - Cancella un promemoria
+- `/crea_regola <numero> <contenuto>` - Crea o aggiorna una regola (solo admin)
+- `/cancella_regola <numero>` - Cancella una regola (solo admin)
+
+> **Nota**: I comandi `/crea_regola` e `/cancella_regola` sono disponibili solo per gli amministratori del gruppo.
 
 ## 📝 Script Disponibili
 
