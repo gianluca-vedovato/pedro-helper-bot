@@ -163,6 +163,59 @@ export async function applyPollToRules(params: {
   }
 }
 
+export async function generateRuleContent(ruleNumber: number, topic: string, existingRules: string): Promise<string> {
+  try {
+    console.log('🤖 AI: Chiamata generateRuleContent per regola:', ruleNumber, 'tema:', topic)
+    
+    const openai = getClient()
+    const model = process.env.OPENAI_MODEL || 'gpt-5'
+    console.log('🤖 AI: Modello utilizzato:', model)
+    
+    const prompt = `Sei un esperto di fantacalcio che scrive regole chiare e precise.
+
+Regole esistenti nel regolamento:
+${existingRules || 'Nessuna regola esistente'}
+
+Devi creare la regola numero ${ruleNumber} sul tema: "${topic}"
+
+Requisiti:
+- La regola deve essere chiara, concisa e specifica
+- Deve essere applicabile e non ambigua
+- Deve integrarsi bene con le regole esistenti
+- Deve essere scritta in italiano
+- Lunghezza consigliata: 1-3 frasi
+
+Genera SOLO il contenuto della regola, senza numerazione o formattazione aggiuntiva.`
+
+    const resp = await openai.chat.completions.create({
+      model,
+      messages: [
+        {
+          role: 'system',
+          content: 'Sei un assistente esperto di fantacalcio che scrive regole chiare e precise per un regolamento.'
+        },
+        {
+          role: 'user',
+          content: prompt
+        }
+      ],
+      max_completion_tokens: 200
+    })
+    
+    const content = resp.choices?.[0]?.message?.content?.trim()
+    if (content) {
+      console.log('✅ AI: Regola generata con successo')
+      return content
+    } else {
+      console.error('❌ AI: Nessuna regola generata da OpenAI')
+      throw new Error('Nessuna regola generata')
+    }
+  } catch (error) {
+    console.error('❌ AI: Errore in generateRuleContent:', error)
+    throw new Error(`Errore nella generazione della regola: ${error instanceof Error ? error.message : 'Errore sconosciuto'}`)
+  }
+}
+
 function safeParse(input?: string | null): any {
   if (!input) return {}
   try {

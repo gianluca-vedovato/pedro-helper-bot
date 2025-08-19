@@ -1,6 +1,6 @@
 import { Telegraf } from 'telegraf'
 import type { Context } from 'telegraf'
-import { askAboutRules, applyPollToRules } from './services/ai'
+import { askAboutRules, applyPollToRules, generateRuleContent } from './services/ai'
 import { getSupabase, rulesGetAll, rulesUpsert, rulesDelete } from './services/db'
 import { pollsUpsert, pollGetById } from './services/db'
 
@@ -21,12 +21,12 @@ function ensureBot() {
 
     bot.start(async (ctx) => {
       console.log('🚀 Comando /start ricevuto')
-      await ctx.reply('Ciao! Sono Pedro (Node). Comandi:\n/regolamento [n]\n/askpedro [domanda]\n/promemoria, /promemoria_lista, /promemoria_cancella\n/crea_regola, /cancella_regola')
+      await ctx.reply('Ciao! Sono Pedro (Node). Comandi:\n/regolamento [n]\n/askpedro [domanda]\n/promemoria, /promemoria_lista, /promemoria_cancella\n/crea_regola [tema], /cancella_regola')
     })
 
     bot.help(async (ctx) => {
       console.log('❓ Comando /help ricevuto')
-      await ctx.reply('Comandi:\n/start\n/help\n/regolamento [numero]\n/askpedro [domanda]\n/promemoria <testo>\n/promemoria_lista\n/promemoria_cancella <id>\n/crea_regola <numero> <contenuto>\n/cancella_regola <numero>')
+      await ctx.reply('Comandi:\n/start\n/help\n/regolamento [numero]\n/askpedro [domanda]\n/promemoria <testo>\n/promemoria_lista\n/promemoria_cancella <id>\n/crea_regola <numero> <tema>\n/cancella_regola <numero>')
     })
 
     bot.command('regolamento', async (ctx) => {
@@ -100,18 +100,18 @@ function ensureBot() {
       console.log('📝 Comando /crea_regola ricevuto')
       const args = (ctx.message?.text || '').split(' ').slice(1)
       if (args.length < 2) {
-        return ctx.reply('❌ Uso: /crea_regola <numero> <contenuto>\n\nEsempio:\n/crea_regola 1 "La squadra deve avere 25 giocatori"')
+        return ctx.reply('❌ Uso: /crea_regola <numero> <tema>\n\nEsempio:\n/crea_regola 1 "formazione squadra"\n\n🤖 L\'AI genererà automaticamente il contenuto della regola!')
       }
       
       const ruleNumber = Number(args[0])
-      const content = args.slice(1).join(' ')
+      const topic = args.slice(1).join(' ')
       
       if (!Number.isInteger(ruleNumber) || ruleNumber <= 0) {
         return ctx.reply('❌ Il numero della regola deve essere un numero intero positivo.')
       }
       
-      if (content.length < 5) {
-        return ctx.reply('❌ Il contenuto della regola deve essere di almeno 5 caratteri.')
+      if (topic.length < 3) {
+        return ctx.reply('❌ Il tema della regola deve essere di almeno 3 caratteri.')
       }
       
       const chatId = ctx.chat?.id as number
@@ -123,15 +123,34 @@ function ensureBot() {
       }
       
       try {
-        const success = await rulesUpsert(ruleNumber, content)
+        // Mostra messaggio di "generazione in corso"
+        const processingMsg = await ctx.reply('🤖 Sto generando la regola con l\'AI...')
+        
+        // Ottieni le regole esistenti per il contesto
+        const existingRules = await rulesGetAll()
+        const existingRulesText = existingRules.length > 0 
+          ? existingRules.map((r: any) => `${r.rule_number}. ${r.content}`).join('\n')
+          : 'Nessuna regola esistente'
+        
+        // Genera il contenuto della regola con l'AI
+        const generatedContent = await generateRuleContent(ruleNumber, topic, existingRulesText)
+        
+        // Salva la regola generata
+        const success = await rulesUpsert(ruleNumber, generatedContent)
+        
         if (success) {
-          return ctx.reply(`✅ Regola ${ruleNumber} creata/aggiornata con successo!\n\n📋 Contenuto:\n${content}`)
+          // Elimina il messaggio di "generazione in corso"
+          await ctx.telegram.deleteMessage(chatId, processingMsg.message_id)
+          
+          return ctx.reply(`✅ Regola ${ruleNumber} generata e salvata con successo!\n\n📋 Contenuto generato dall'AI:\n"${generatedContent}"\n\n💡 Tema richiesto: "${topic}"`)
         } else {
-          return ctx.reply('❌ Errore durante il salvataggio della regola.')
+          // Elimina il messaggio di "generazione in corso"
+          await ctx.telegram.deleteMessage(chatId, processingMsg.message_id)
+          return ctx.reply('❌ Errore durante il salvataggio della regola generata.')
         }
       } catch (error) {
-        console.error('Errore creazione regola:', error)
-        return ctx.reply('❌ Errore interno durante la creazione della regola.')
+        console.error('Errore creazione regola con AI:', error)
+        return ctx.reply(`❌ Errore durante la generazione della regola: ${error instanceof Error ? error.message : 'Errore sconosciuto'}`)
       }
     })
 
