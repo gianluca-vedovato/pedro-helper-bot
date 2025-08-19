@@ -7,14 +7,67 @@ function getClient(): OpenAI {
   return new OpenAI({ apiKey })
 }
 
+const MODEL = 'gpt-4o'
+
+function splitRulesIntoBlocks(rulesText: string): string[] {
+  // Prova a splittare per doppie newline; fallback a singola newline
+  const blocks = rulesText
+    .split(/\n\n+/)
+    .map((b) => b.trim())
+    .filter(Boolean)
+  if (blocks.length > 1) return blocks
+  return rulesText
+    .split(/\n+/)
+    .map((b) => b.trim())
+    .filter(Boolean)
+}
+
+function pickRelevantRulesBlocks(rulesText: string, question: string, maxChars = 14000): string {
+  const normalizedQuestion = question.toLowerCase()
+  const keywords = Array.from(
+    new Set(
+      normalizedQuestion
+        .replace(/[^a-zàèéìòóù0-9\s]/gi, ' ')
+        .split(/\s+/)
+        .filter((w) => w.length >= 3)
+    )
+  )
+  const blocks = splitRulesIntoBlocks(rulesText)
+  const scored = blocks.map((block) => {
+    const text = block.toLowerCase()
+    let score = 0
+    for (const kw of keywords) {
+      if (!kw) continue
+      const occurrences = text.split(kw).length - 1
+      score += occurrences
+    }
+    // Boost se il blocco inizia con numero regola
+    if (/^\d+\s*\./.test(block)) score += 0.5
+    return { block, score }
+  })
+  scored.sort((a, b) => b.score - a.score)
+  const top = scored.slice(0, Math.max(5, Math.min(15, Math.ceil(scored.length * 0.3))))
+  let result = top.map((t) => t.block).join('\n\n')
+  if (result.length > maxChars) result = result.slice(0, maxChars)
+  // Se non c'è nessuna corrispondenza, restituisci le prime N regole
+  if (!result.trim()) {
+    const fallback = blocks.slice(0, 15).join('\n\n')
+    return fallback.length > maxChars ? fallback.slice(0, maxChars) : fallback
+  }
+  return result
+}
+
 export async function askAboutRules(question: string, rulesText: string): Promise<string> {
   try {
     console.log('🤖 AI: Chiamata askAboutRules per domanda:', question)
     console.log('🤖 AI: Regole disponibili:', rulesText ? 'Sì' : 'No')
     
     const openai = getClient()
-    const model = process.env.OPENAI_MODEL || 'gpt-5'
+    const model = MODEL
     console.log('🤖 AI: Modello utilizzato:', model)
+    console.log('🤖 AI: Lunghezza regolamento originale (char):', rulesText.length)
+    const effectiveRules = rulesText.length > 14000 ? pickRelevantRulesBlocks(rulesText, question) : rulesText
+    console.log('🤖 AI: Lunghezza regolamento usato (char):', effectiveRules.length)
     
     const resp = await openai.chat.completions.create({
       model,
@@ -24,7 +77,7 @@ export async function askAboutRules(question: string, rulesText: string): Promis
           content: `Sei un assistente esperto di fantacalcio. La tua missione è rispondere alle domande basandoti ESCLUSIVAMENTE sul regolamento fornito.
 
 REGOLAMENTO COMPLETO:
-${rulesText}
+${effectiveRules}
 
 ISTRUZIONI IMPORTANTI:
 1. LEGGI ATTENTAMENTE ogni regola del regolamento fornito
@@ -41,15 +94,17 @@ RICORDA: Guarda molto bene nel regolamento - qualcosa trovi quasi sicuramente!`
           content: question
         }
       ],
-      max_completion_tokens: 500
+      max_tokens: 500,
+      temperature: 0.2
     })
     
-    const content = resp.choices?.[0]?.message?.content?.trim()
+    const firstChoice = resp.choices?.[0]
+    const content = firstChoice?.message?.content?.trim()
     if (content) {
       console.log('✅ AI: Risposta generata con successo')
       return content
     } else {
-      console.error('❌ AI: Nessuna risposta generata da OpenAI')
+      console.error('❌ AI: Nessuna risposta generata da OpenAI. Choice:', JSON.stringify(firstChoice || {}, null, 2))
       return '❌ Non sono riuscito a generare una risposta. Assicurati di chiedere solo domande relative al regolamento fantacalcio.'
     }
   } catch (error) {
@@ -129,7 +184,7 @@ export async function applyPollToRules(params: {
   ].join('\n')
 
   const completion = await openai.chat.completions.create({
-    model: process.env.OPENAI_MODEL || 'gpt-5',
+    model: MODEL,
     messages: [
       {
         role: 'system',
@@ -139,7 +194,9 @@ export async function applyPollToRules(params: {
       { role: 'user', content: userContent }
     ],
     tools,
-    tool_choice: 'required'
+    tool_choice: 'required',
+    max_tokens: 300,
+    temperature: 0.2
   })
 
   const toolCalls = completion.choices?.[0]?.message?.tool_calls || []
@@ -181,7 +238,7 @@ export async function generateRuleContent(ruleNumber: number, topic: string, exi
     console.log('🤖 AI: Chiamata generateRuleContent per regola:', ruleNumber, 'tema:', topic)
     
     const openai = getClient()
-    const model = process.env.OPENAI_MODEL || 'gpt-5'
+    const model = MODEL
     console.log('🤖 AI: Modello utilizzato:', model)
     
     const prompt = `Sei un esperto di fantacalcio che scrive regole chiare e precise.
@@ -212,7 +269,8 @@ Genera SOLO il contenuto della regola, senza numerazione o formattazione aggiunt
           content: prompt
         }
       ],
-      max_completion_tokens: 200
+      max_tokens: 200,
+      temperature: 0.2
     })
     
     const content = resp.choices?.[0]?.message?.content?.trim()
