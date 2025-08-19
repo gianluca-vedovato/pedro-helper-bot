@@ -23,6 +23,9 @@ export async function askAboutRules(question: string, rulesText: string): Promis
           role: 'system',
           content: `Sei un assistente esperto di fantacalcio. La tua missione è rispondere alle domande basandoti ESCLUSIVAMENTE sul regolamento fornito.
 
+REGOLAMENTO COMPLETO:
+${rulesText}
+
 ISTRUZIONI IMPORTANTI:
 1. LEGGI ATTENTAMENTE ogni regola del regolamento fornito
 2. ANALIZZA la domanda dell'utente per capire cosa sta chiedendo
@@ -35,7 +38,7 @@ RICORDA: Guarda molto bene nel regolamento - qualcosa trovi quasi sicuramente!`
         },
         {
           role: 'user',
-          content: `Regolamento:\n${rulesText}\n\nDomanda: ${question}`
+          content: question
         }
       ],
       max_completion_tokens: 500
