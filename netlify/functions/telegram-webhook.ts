@@ -1,7 +1,7 @@
 import { Telegraf } from 'telegraf'
 import type { Context } from 'telegraf'
 import { askAboutRules, applyPollToRules, generateRuleContent } from './services/ai'
-import { getSupabase, rulesGetAll, rulesUpsert, rulesDelete } from './services/db'
+import { getSupabase, rulesGetAll, rulesUpsert, rulesDelete, rulesNextNumber } from './services/db'
 import { pollsUpsert, pollGetById } from './services/db'
 
 const BOT_TOKEN = process.env.BOT_TOKEN
@@ -26,7 +26,7 @@ function ensureBot() {
 
     bot.help(async (ctx) => {
       console.log('❓ Comando /help ricevuto')
-      await ctx.reply('Comandi:\n/start\n/help\n/regolamento [numero]\n/askpedro [domanda]\n/promemoria <testo>\n/promemoria_lista\n/promemoria_cancella <id>\n/crea_regola <numero> <tema>\n/cancella_regola <numero>')
+      await ctx.reply('Comandi:\n/start\n/help\n/regolamento [numero]\n/askpedro [domanda]\n/promemoria <testo>\n/promemoria_lista\n/promemoria_cancella <id>\n/crea_regola <tema>\n/cancella_regola <numero>')
     })
 
     bot.command('regolamento', async (ctx) => {
@@ -99,16 +99,11 @@ function ensureBot() {
     bot.command('crea_regola', async (ctx) => {
       console.log('📝 Comando /crea_regola ricevuto')
       const args = (ctx.message?.text || '').split(' ').slice(1)
-      if (args.length < 2) {
-        return ctx.reply('❌ Uso: /crea_regola <numero> <tema>\n\nEsempio:\n/crea_regola 1 "formazione squadra"\n\n🤖 L\'AI genererà automaticamente il contenuto della regola!')
+      if (args.length < 1) {
+        return ctx.reply('❌ Uso: /crea_regola <tema>\n\nEsempio:\n/crea_regola "formazione squadra"\n\n🤖 L\'AI genererà automaticamente il contenuto e il numero progressivo della regola!')
       }
       
-      const ruleNumber = Number(args[0])
-      const topic = args.slice(1).join(' ')
-      
-      if (!Number.isInteger(ruleNumber) || ruleNumber <= 0) {
-        return ctx.reply('❌ Il numero della regola deve essere un numero intero positivo.')
-      }
+      const topic = args.join(' ')
       
       if (topic.length < 3) {
         return ctx.reply('❌ Il tema della regola deve essere di almeno 3 caratteri.')
@@ -125,6 +120,9 @@ function ensureBot() {
       try {
         // Mostra messaggio di "generazione in corso"
         const processingMsg = await ctx.reply('🤖 Sto generando la regola con l\'AI...')
+        
+        // Ottieni il prossimo numero disponibile per la regola
+        const ruleNumber = await rulesNextNumber()
         
         // Ottieni le regole esistenti per il contesto
         const existingRules = await rulesGetAll()
