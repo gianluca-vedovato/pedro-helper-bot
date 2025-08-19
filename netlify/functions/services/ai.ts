@@ -21,7 +21,17 @@ export async function askAboutRules(question: string, rulesText: string): Promis
       messages: [
         {
           role: 'system',
-          content: `Sei un assistente esperto di fantacalcio. Rispondi alle domande basandoti sul regolamento fornito. Sii chiaro, conciso e utile.`
+          content: `Sei un assistente esperto di fantacalcio. La tua missione è rispondere alle domande basandoti ESCLUSIVAMENTE sul regolamento fornito.
+
+ISTRUZIONI IMPORTANTI:
+1. LEGGI ATTENTAMENTE ogni regola del regolamento fornito
+2. ANALIZZA la domanda dell'utente per capire cosa sta chiedendo
+3. CERCA NEL REGOLAMENTO la risposta specifica - quasi sicuramente troverai qualcosa di rilevante
+4. Se trovi regole pertinenti, citala/e specificamente (es. "Secondo la regola X...")
+5. Se la domanda non è coperta dal regolamento, dillo chiaramente
+6. Sii preciso, conciso e sempre basato sulle regole scritte
+
+RICORDA: Guarda molto bene nel regolamento - qualcosa trovi quasi sicuramente!`
         },
         {
           role: 'user',
