@@ -291,6 +291,36 @@ Genera SOLO il contenuto della regola, senza numerazione o formattazione aggiunt
   }
 }
 
+export async function buildRegulationMarkdown(rules: { rule_number: number; content: string }[]): Promise<string> {
+  const openai = getClient()
+  const model = MODEL
+  const rulesText = rules.map((r) => `Art. ${r.rule_number}: ${r.content}`).join('\n\n')
+
+  const prompt = `Sei un redattore professionista. Trasforma il seguente regolamento in un documento MARKDOWN formale e ben impaginato.
+
+REQUISITI:
+- Usa titolo H1 "Regolamento"
+- Ogni articolo come H2: "Art. N — Titolo sintetico"
+- Contenuto in paragrafi ordinati; se opportuno usa elenchi puntati/numerati
+- Mantieni il senso, migliora la formattazione
+- NIENTE preamboli o commenti, rispondi SOLO con Markdown
+
+TESTO DI PARTENZA:
+${rulesText}`
+
+  const resp = await openai.chat.completions.create({
+    model,
+    messages: [
+      { role: 'system', content: 'Produci SOLO Markdown valido, senza testo extra.' },
+      { role: 'user', content: prompt }
+    ],
+    temperature: 0.2,
+    max_tokens: 4000
+  })
+  const md = resp.choices?.[0]?.message?.content?.trim() || ''
+  return md || `# Regolamento\n\n${rules.map((r)=>`## Art. ${r.rule_number} — ${r.content.split(/\.|\n/)[0] || ''}\n\n${r.content}`).join('\n\n')}`
+}
+
 function safeParse(input?: string | null): any {
   if (!input) return {}
   try {

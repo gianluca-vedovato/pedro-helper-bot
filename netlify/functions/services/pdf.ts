@@ -2,6 +2,7 @@ import { PDFDocument, StandardFonts, rgb } from 'pdf-lib'
 import chromium from '@sparticuz/chromium'
 import puppeteer from 'puppeteer-core'
 import { rulesGetAll, getSupabase } from './db'
+import MarkdownIt from 'markdown-it'
 
 export async function rebuildAndUploadRulesPdf(): Promise<{ ok: boolean; url?: string; error?: string }> {
   try {
@@ -137,7 +138,7 @@ async function tryGenerateRulesPdfHtml(rules: { rule_number: number; content: st
       headless: chromium.headless
     })
     const page = await browser.newPage()
-    const html = buildHtml(rules)
+    const html = await buildHtmlFromMarkdown(rules)
     await page.setContent(html, { waitUntil: 'networkidle0' })
     const pdf = await page.pdf({
       printBackground: true,
@@ -154,17 +155,11 @@ async function tryGenerateRulesPdfHtml(rules: { rule_number: number; content: st
   }
 }
 
-function buildHtml(rules: { rule_number: number; content: string }[]): string {
+async function buildHtmlFromMarkdown(rules: { rule_number: number; content: string }[]): Promise<string> {
+  const mdBuilder = new MarkdownIt({ html: false, linkify: false, typographer: true })
+  const openaiMd = await (await import('./ai')).buildRegulationMarkdown(rules)
+  const contentHtml = mdBuilder.render(openaiMd)
   const now = new Date().toLocaleString('it-IT')
-  const sections = rules
-    .map(
-      (r) => `
-      <section class="rule">
-        <h2>Art. ${r.rule_number} — ${escapeHtml(firstSentence(r.content))}</h2>
-        <div class="content">${escapeHtml(cleanContent(r.content)).replace(/\n/g, '<br/>')}</div>
-      </section>`
-    )
-    .join('')
   return `<!doctype html>
 <html lang="it">
 <head>
@@ -176,9 +171,11 @@ function buildHtml(rules: { rule_number: number; content: string }[]): string {
     .title { text-align: center; font-size: 20px; font-weight: 700; margin: 0 0 8px; letter-spacing: 0.2px; }
     .subtitle { text-align: center; font-size: 12px; color: #666; margin: 0 0 18px; }
     .hr { height: 1px; background: #e5e5e5; margin: 12px 0 22px; }
+    h1 { font-size: 18px; margin: 0 0 10px; font-weight: 700; text-align: center; }
     h2 { font-size: 14px; margin: 18px 0 8px; font-weight: 700; }
     .num { color: #111; font-weight: 700; }
-    .rule .content { line-height: 1.5; text-align: justify; }
+    .rule .content, p, li { line-height: 1.5; text-align: justify; }
+    ul, ol { padding-left: 18px; }
   </style>
   <title>Regolamento</title>
   </head>
@@ -186,7 +183,7 @@ function buildHtml(rules: { rule_number: number; content: string }[]): string {
   <div class="title">Regolamento</div>
   <div class="subtitle">Versione aggiornata • Generato il ${now}</div>
   <div class="hr"></div>
-  ${sections}
+  <main class="doc">${contentHtml}</main>
 </body>
 </html>`
 }
