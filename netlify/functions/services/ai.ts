@@ -1,5 +1,6 @@
 import OpenAI from 'openai'
 import { rulesDelete, rulesNextNumber, rulesUpsert } from './db'
+import { rebuildAndUploadRulesPdf } from './pdf'
 
 function getClient(): OpenAI {
   const apiKey = process.env.OPENAI_API_KEY
@@ -213,6 +214,7 @@ export async function applyPollToRules(params: {
       if (!content) return { summary: '❌ add_rule: contenuto mancante.' }
       const number = Number.isInteger(args.rule_number) ? Number(args.rule_number) : await rulesNextNumber()
       const ok = await rulesUpsert(number, content)
+      if (ok) await rebuildAndUploadRulesPdf().catch(() => {})
       return { summary: ok ? `✅ Aggiunta regola ${number}` : '❌ Errore aggiunta regola' }
     }
     case 'update_rule': {
@@ -220,12 +222,14 @@ export async function applyPollToRules(params: {
       const content = String(args.content || '').trim()
       if (!Number.isInteger(number) || !content) return { summary: '❌ update_rule: parametri invalidi.' }
       const ok = await rulesUpsert(number, content)
+      if (ok) await rebuildAndUploadRulesPdf().catch(() => {})
       return { summary: ok ? `✅ Aggiornata regola ${number}` : '❌ Errore aggiornamento regola' }
     }
     case 'delete_rule': {
       const number = Number(args.rule_number)
       if (!Number.isInteger(number)) return { summary: '❌ delete_rule: numero non valido.' }
       const ok = await rulesDelete(number)
+      if (ok) await rebuildAndUploadRulesPdf().catch(() => {})
       return { summary: ok ? `✅ Eliminata regola ${number}` : '❌ Errore eliminazione regola' }
     }
     default:

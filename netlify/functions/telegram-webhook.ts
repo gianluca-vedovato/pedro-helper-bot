@@ -2,6 +2,7 @@ import { Telegraf } from 'telegraf'
 // PDF non più generato qui; gestito dall'endpoint dedicato rules-pdf
 import type { Context } from 'telegraf'
 import { askAboutRules, applyPollToRules, generateRuleContent } from './services/ai'
+import { rebuildAndUploadRulesPdf } from './services/pdf'
 import { getSupabase, rulesGetAll, rulesUpsert, rulesDelete, rulesNextNumber } from './services/db'
 import { pollsUpsert, pollGetById } from './services/db'
 
@@ -45,7 +46,9 @@ function ensureBot() {
 
       // Invia direttamente il link al PDF servito via Function HTTP
       const baseUrl = process.env.SITE_URL || process.env.URL || ''
-      const link = baseUrl ? `${baseUrl.replace(/\/$/, '')}/regolamento.pdf` : '/regolamento.pdf'
+      const supaUrl = process.env.SUPABASE_URL || ''
+      const publicPdf = supaUrl ? `${supaUrl.replace(/\/$/, '')}/storage/v1/object/public/assets/regolamento.pdf` : ''
+      const link = publicPdf || (baseUrl ? `${baseUrl.replace(/\/$/, '')}/regolamento.pdf` : '/regolamento.pdf')
       await ctx.reply(`📄 Scarica il PDF del regolamento: ${link}`)
     })
 
@@ -140,6 +143,8 @@ function ensureBot() {
         const success = await rulesUpsert(ruleNumber, generatedContent)
         
         if (success) {
+          // Rigenera PDF
+          await rebuildAndUploadRulesPdf().catch(() => {})
           // Elimina il messaggio di "generazione in corso"
           await ctx.telegram.deleteMessage(chatId, processingMsg.message_id)
           
@@ -179,6 +184,7 @@ function ensureBot() {
       try {
         const success = await rulesDelete(ruleNumber)
         if (success) {
+          await rebuildAndUploadRulesPdf().catch(() => {})
           return ctx.reply(`✅ Regola ${ruleNumber} cancellata con successo!`)
         } else {
           return ctx.reply('❌ Errore durante la cancellazione della regola.')
@@ -186,6 +192,23 @@ function ensureBot() {
       } catch (error) {
         console.error('Errore cancellazione regola:', error)
         return ctx.reply('❌ Errore interno durante la cancellazione della regola.')
+      }
+    })
+
+    bot.command('rigenera_regolamento', async (ctx) => {
+      try {
+        const chatId = ctx.chat?.id as number
+        const userId = ctx.from?.id as number
+        const isAdmin = await userIsAdmin(ctx, chatId, userId)
+        if (!isAdmin) return ctx.reply('❌ Solo gli amministratori possono rigenerare il PDF.')
+        const processing = await ctx.reply('🔄 Rigenero il PDF del regolamento...')
+        const res = await rebuildAndUploadRulesPdf()
+        await ctx.telegram.deleteMessage(chatId, (processing as any).message_id)
+        if (!res.ok) return ctx.reply(`❌ Errore rigenerazione PDF: ${res.error || 'sconosciuto'}`)
+        return ctx.reply(`✅ PDF rigenerato. Link: ${res.url}`)
+      } catch (e) {
+        console.error('Errore rigenera_regolamento:', e)
+        return ctx.reply('❌ Errore durante la rigenerazione del PDF.')
       }
     })
 
