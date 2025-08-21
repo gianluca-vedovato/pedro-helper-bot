@@ -140,6 +140,8 @@ async function tryGenerateRulesPdfHtml(rules: { rule_number: number; content: st
     const page = await browser.newPage()
     const html = await buildHtmlFromMarkdown(rules)
     await page.setContent(html, { waitUntil: 'networkidle0' })
+    // small layout settle
+    await page.waitForTimeout(50)
     const pdf = await page.pdf({
       printBackground: true,
       format: 'A4',

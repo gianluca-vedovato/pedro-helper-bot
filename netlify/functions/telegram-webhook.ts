@@ -50,7 +50,8 @@ function ensureBot() {
       const bucket = process.env.SUPABASE_BUCKET || 'assets'
       const pdfPath = process.env.SUPABASE_RULES_PDF_PATH || 'regolamento.pdf'
       const publicPdf = supaUrl ? `${supaUrl.replace(/\/$/, '')}/storage/v1/object/public/${bucket}/${pdfPath}` : ''
-      const link = publicPdf || (baseUrl ? `${baseUrl.replace(/\/$/, '')}/regolamento.pdf` : '/regolamento.pdf')
+      const bust = Date.now()
+      const link = (publicPdf || (baseUrl ? `${baseUrl.replace(/\/$/, '')}/regolamento.pdf` : '/regolamento.pdf')) + `?t=${bust}`
       await ctx.reply(`📄 Scarica il PDF del regolamento: ${link}`)
     })
 
