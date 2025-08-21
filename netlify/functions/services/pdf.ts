@@ -13,6 +13,11 @@ export async function rebuildAndUploadRulesPdf(): Promise<{ ok: boolean; url?: s
     if (!client) return { ok: false, error: 'Supabase non configurato' }
     const bucket = process.env.SUPABASE_BUCKET || 'assets'
     const path = process.env.SUPABASE_RULES_PDF_PATH || 'regolamento.pdf'
+    // Assicura che il bucket esista ed è pubblico
+    const { error: bucketCreateError } = await (client as any).storage.createBucket(bucket, { public: true })
+    if (bucketCreateError && !String(bucketCreateError.message || '').toLowerCase().includes('already exists')) {
+      return { ok: false, error: `Bucket error: ${bucketCreateError.message}` }
+    }
     const { error } = await client.storage.from(bucket).upload(path, buffer, {
       contentType: 'application/pdf',
       upsert: true
