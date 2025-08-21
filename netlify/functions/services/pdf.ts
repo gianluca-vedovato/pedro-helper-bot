@@ -167,7 +167,8 @@ async function tryGenerateRulesPdfHtml(rules: { rule_number: number; content: st
     })
     await browser.close()
     return { buffer: Buffer.from(pdf), mdLength: built.md.length, htmlLength: built.html.length }
-  } catch {
+  } catch (e) {
+    console.error('PDF HTML renderer errore:', e)
     return { buffer: null, mdLength: 0, htmlLength: 0 }
   }
 }

@@ -9,7 +9,7 @@
 
 [functions."telegram-webhook"]
   node_bundler = "esbuild"
-  external_node_modules = ["@supabase/supabase-js"]
+  external_node_modules = ["@supabase/supabase-js", "@sparticuz/chromium", "puppeteer-core"]
 
 [functions."telegram-webhook-local"]
   node_bundler = "esbuild"
