@@ -122,118 +122,123 @@ export async function applyPollToRules(params: {
   options: PollOptionSnapshot[]
   rulesText: string
 }): Promise<{ summary: string }> {
-  const openai = getClient()
+  try {
+    const openai = getClient()
 
-  const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
-    {
-      type: 'function',
-      function: {
-        name: 'add_rule',
-        description: 'Aggiunge una nuova regola al regolamento',
-        parameters: {
-          type: 'object',
-          properties: {
-            content: { type: 'string', description: 'Testo completo della regola' },
-            rule_number: { type: 'integer', description: 'Numero della regola, opzionale' }
-          },
-          required: ['content']
-        }
-      }
-    },
-    {
-      type: 'function',
-      function: {
-        name: 'update_rule',
-        description: 'Aggiorna una regola esistente',
-        parameters: {
-          type: 'object',
-          properties: {
-            rule_number: { type: 'integer' },
-            content: { type: 'string' }
-          },
-          required: ['rule_number', 'content']
-        }
-      }
-    },
-    {
-      type: 'function',
-      function: {
-        name: 'delete_rule',
-        description: 'Elimina una regola esistente',
-        parameters: {
-          type: 'object',
-          properties: {
-            rule_number: { type: 'integer' }
-          },
-          required: ['rule_number']
-        }
-      }
-    }
-  ]
-
-  const winningOptions = pickWinningOptions(params.options)
-  const userContent = [
-    `Sondaggio: ${params.question}`,
-    `Opzioni (testo → voti):`,
-    ...params.options.map((o) => `- ${o.text} → ${o.voter_count}`),
-    `\nOpzione/i vincente/i:`,
-    ...winningOptions.map((o) => `- ${o.text} → ${o.voter_count}`),
-    `\nRegolamento attuale:`,
-    params.rulesText,
-    `\nIn base ai risultati, scegli ed ESEGUI UNA SOLA azione tra: add_rule, update_rule, delete_rule.`,
-    `Rispondi usando esclusivamente una chiamata funzione.`
-  ].join('\n')
-
-  const completion = await openai.chat.completions.create({
-    model: MODEL,
-    messages: [
+    const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
       {
-        role: 'system',
-        content:
-          'Sei un assistente che MODIFICA il regolamento in base ai risultati di un sondaggio. Usa UNA SOLA funzione tra: add_rule, update_rule, delete_rule.'
+        type: 'function',
+        function: {
+          name: 'add_rule',
+          description: 'Aggiunge una nuova regola al regolamento',
+          parameters: {
+            type: 'object',
+            properties: {
+              content: { type: 'string', description: 'Testo completo della regola' },
+              rule_number: { type: 'integer', description: 'Numero della regola, opzionale' }
+            },
+            required: ['content']
+          }
+        }
       },
-      { role: 'user', content: userContent }
-    ],
-    tools,
-    tool_choice: 'required',
-    max_tokens: 300,
-    temperature: 0.2
-  })
+      {
+        type: 'function',
+        function: {
+          name: 'update_rule',
+          description: 'Aggiorna una regola esistente',
+          parameters: {
+            type: 'object',
+            properties: {
+              rule_number: { type: 'integer' },
+              content: { type: 'string' }
+            },
+            required: ['rule_number', 'content']
+          }
+        }
+      },
+      {
+        type: 'function',
+        function: {
+          name: 'delete_rule',
+          description: 'Elimina una regola esistente',
+          parameters: {
+            type: 'object',
+            properties: {
+              rule_number: { type: 'integer' }
+            },
+            required: ['rule_number']
+          }
+        }
+      }
+    ]
 
-  const toolCalls = completion.choices?.[0]?.message?.tool_calls || []
-  if (!toolCalls.length) return { summary: '❌ Nessuna modifica applicata.' }
+    const winningOptions = pickWinningOptions(params.options)
+    const userContent = [
+      `Sondaggio: ${params.question}`,
+      `Opzioni (testo → voti):`,
+      ...params.options.map((o) => `- ${o.text} → ${o.voter_count}`),
+      `\nOpzione/i vincente/i:`,
+      ...winningOptions.map((o) => `- ${o.text} → ${o.voter_count}`),
+      `\nRegolamento attuale:`,
+      params.rulesText,
+      `\nIn base ai risultati, scegli ed ESEGUI UNA SOLA azione tra: add_rule, update_rule, delete_rule.`,
+      `Rispondi usando esclusivamente una chiamata funzione.`
+    ].join('\n')
 
-  const call = toolCalls[0]
-  const name = call.function?.name
-  const args = safeParse(call.function?.arguments)
-  if (!name) return { summary: '❌ Nessuna funzione selezionata.' }
+    const completion = await openai.chat.completions.create({
+      model: MODEL,
+      messages: [
+        {
+          role: 'system',
+          content:
+            'Sei un assistente che MODIFICA il regolamento in base ai risultati di un sondaggio. Usa UNA SOLA funzione tra: add_rule, update_rule, delete_rule.'
+        },
+        { role: 'user', content: userContent }
+      ],
+      tools,
+      tool_choice: 'required',
+      max_tokens: 300,
+      temperature: 0.2
+    })
 
-  switch (name) {
-    case 'add_rule': {
-      const content = String(args.content || '').trim()
-      if (!content) return { summary: '❌ add_rule: contenuto mancante.' }
-      const number = Number.isInteger(args.rule_number) ? Number(args.rule_number) : await rulesNextNumber()
-      const ok = await rulesUpsert(number, content)
-      if (ok) await rebuildAndUploadRulesPdf().catch(() => {})
-      return { summary: ok ? `✅ Aggiunta regola ${number}` : '❌ Errore aggiunta regola' }
+    const toolCalls = completion.choices?.[0]?.message?.tool_calls || []
+    if (!toolCalls.length) return { summary: '❌ Nessuna modifica applicata.' }
+
+    const call = toolCalls[0]
+    const name = call.function?.name
+    const args = safeParse(call.function?.arguments)
+    if (!name) return { summary: '❌ Nessuna funzione selezionata.' }
+
+    switch (name) {
+      case 'add_rule': {
+        const content = String(args.content || '').trim()
+        if (!content) return { summary: '❌ add_rule: contenuto mancante.' }
+        const number = Number.isInteger(args.rule_number) ? Number(args.rule_number) : await rulesNextNumber()
+        const ok = await rulesUpsert(number, content)
+        if (ok) await rebuildAndUploadRulesPdf().catch(() => {})
+        return { summary: ok ? `✅ Aggiunta regola ${number}` : '❌ Errore aggiunta regola' }
+      }
+      case 'update_rule': {
+        const number = Number(args.rule_number)
+        const content = String(args.content || '').trim()
+        if (!Number.isInteger(number) || !content) return { summary: '❌ update_rule: parametri invalidi.' }
+        const ok = await rulesUpsert(number, content)
+        if (ok) await rebuildAndUploadRulesPdf().catch(() => {})
+        return { summary: ok ? `✅ Aggiornata regola ${number}` : '❌ Errore aggiornamento regola' }
+      }
+      case 'delete_rule': {
+        const number = Number(args.rule_number)
+        if (!Number.isInteger(number)) return { summary: '❌ delete_rule: numero non valido.' }
+        const ok = await rulesDelete(number)
+        if (ok) await rebuildAndUploadRulesPdf().catch(() => {})
+        return { summary: ok ? `✅ Eliminata regola ${number}` : '❌ Errore eliminazione regola' }
+      }
+      default:
+        return { summary: '❌ Funzione non supportata.' }
     }
-    case 'update_rule': {
-      const number = Number(args.rule_number)
-      const content = String(args.content || '').trim()
-      if (!Number.isInteger(number) || !content) return { summary: '❌ update_rule: parametri invalidi.' }
-      const ok = await rulesUpsert(number, content)
-      if (ok) await rebuildAndUploadRulesPdf().catch(() => {})
-      return { summary: ok ? `✅ Aggiornata regola ${number}` : '❌ Errore aggiornamento regola' }
-    }
-    case 'delete_rule': {
-      const number = Number(args.rule_number)
-      if (!Number.isInteger(number)) return { summary: '❌ delete_rule: numero non valido.' }
-      const ok = await rulesDelete(number)
-      if (ok) await rebuildAndUploadRulesPdf().catch(() => {})
-      return { summary: ok ? `✅ Eliminata regola ${number}` : '❌ Errore eliminazione regola' }
-    }
-    default:
-      return { summary: '❌ Funzione non supportata.' }
+  } catch (error) {
+    const message = (error instanceof Error ? error.message : 'Errore sconosciuto').trim()
+    return { summary: `❌ Errore applicazione sondaggio: ${message}` }
   }
 }
 
