@@ -53,10 +53,10 @@ function ensureBot() {
         )
       } catch (e) {
         console.error('Errore generazione PDF regolamento:', e)
-        // Fallback: invia link alla versione testo nel caso PDF fallisca
-        let resp = '📚 Regolamento Completo:\n\n'
-        for (const r of rules as any[]) resp += `**${r.rule_number}.** ${formatRule(r.content)}\n\n`
-        for (let i = 0; i < resp.length; i += 4096) await ctx.reply(resp.slice(i, i + 4096), { parse_mode: 'Markdown' })
+        // Fallback: link a PDF servito via Function HTTP
+        const baseUrl = process.env.SITE_URL || process.env.URL || ''
+        const link = baseUrl ? `${baseUrl.replace(/\/$/, '')}/regolamento.pdf` : '/regolamento.pdf'
+        await ctx.reply(`📄 Scarica il PDF del regolamento: ${link}`)
       }
     })
 

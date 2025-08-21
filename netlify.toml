@@ -15,3 +15,9 @@
   node_bundler = "esbuild"
 
 
+[[redirects]]
+  from = "/regolamento.pdf"
+  to = "/.netlify/functions/rules-pdf"
+  status = 200
+
+
