@@ -1,6 +1,4 @@
-// Importazione che forza l'inclusione dei dati font standard in ambienti serverless
-import PDFDocument from 'pdfkit'
-import 'pdfkit/js/data' // hint per bundler: includi i font standard
+import { PDFDocument, StandardFonts, rgb } from 'pdf-lib'
 import { rulesGetAll } from './services/db'
 
 export async function handler(event: any) {
@@ -33,77 +31,107 @@ export async function handler(event: any) {
 }
 
 async function generateRulesPdfBuffer(rules: { rule_number: number; content: string }[]): Promise<Buffer> {
-  return await new Promise<Buffer>((resolve, reject) => {
-    try {
-      const doc = new PDFDocument({ size: 'A4', margins: { top: 64, bottom: 64, left: 56, right: 56 } })
-      const chunks: Buffer[] = []
-      doc.on('data', (d: Buffer) => chunks.push(d))
-      doc.on('error', reject)
-      doc.on('end', () => resolve(Buffer.concat(chunks)))
+  const pdf = await PDFDocument.create()
+  const helvetica = await pdf.embedFont(StandardFonts.Helvetica)
+  const helveticaBold = await pdf.embedFont(StandardFonts.HelveticaBold)
 
-      const generatedAt = new Date()
-      doc.info = {
-        Title: 'Regolamento Fantacalcio',
-        Author: 'Pedro Bot',
-        Subject: 'Regolamento ufficiale del Fantacalcio del gruppo',
-        Keywords: 'fantacalcio, regolamento, regole, pedro bot',
-        CreationDate: generatedAt as unknown as Date,
-        ModDate: generatedAt as unknown as Date
-      } as any
+  const A4 = { width: 595.28, height: 841.89 }
+  const margin = { top: 64, bottom: 64, left: 56, right: 56 }
 
-      const drawHeader = () => {
-        const top = doc.page.margins.top - 36
-        doc.save()
-        doc.font('Helvetica-Bold').fontSize(10).fillColor('#333333')
-        doc.text('Regolamento Fantacalcio', doc.page.margins.left, top, { align: 'left' })
-        doc.moveTo(doc.page.margins.left, top + 16).lineTo(doc.page.width - doc.page.margins.right, top + 16).lineWidth(0.5).stroke('#DDDDDD')
-        doc.restore()
-      }
-      const drawFooter = () => {
-        const y = doc.page.height - doc.page.margins.bottom + 24
-        doc.save()
-        doc.moveTo(doc.page.margins.left, y - 10).lineTo(doc.page.width - doc.page.margins.right, y - 10).lineWidth(0.5).stroke('#EEEEEE')
-        doc.font('Helvetica').fontSize(9).fillColor('#666666')
-        const pageNo = (doc as any)._pageBuffer?.length ? (doc as any)._pageBuffer.length + 1 : 1
-        doc.text(`Pagina ${pageNo}`, doc.page.margins.left, y, { width: doc.page.width - doc.page.margins.left - doc.page.margins.right, align: 'right' })
-        doc.restore()
-      }
-      const onPage = () => {
-        drawHeader()
-        drawFooter()
-      }
-      doc.on('pageAdded', onPage)
+  const header = (page: any, _pageNo: number) => {
+    const { width, height } = page.getSize()
+    const y = height - margin.top + 28
+    page.drawLine({ start: { x: margin.left, y: y - 14 }, end: { x: width - margin.right, y: y - 14 }, thickness: 0.5, color: rgb(0.87, 0.87, 0.87) })
+    page.drawText('Regolamento Fantacalcio', { x: margin.left, y, size: 10, font: helveticaBold, color: rgb(0.2, 0.2, 0.2) })
+  }
+  const footer = (page: any, pageNo: number) => {
+    const { width } = page.getSize()
+    const y = margin.bottom - 28
+    page.drawLine({ start: { x: margin.left, y: y + 14 }, end: { x: width - margin.right, y: y + 14 }, thickness: 0.5, color: rgb(0.93, 0.93, 0.93) })
+    const text = `Pagina ${pageNo}`
+    const textWidth = helvetica.widthOfTextAtSize(text, 9)
+    page.drawText(text, { x: width - margin.right - textWidth, y, size: 9, font: helvetica, color: rgb(0.4, 0.4, 0.4) })
+  }
 
-      // Prima pagina: Indice
-      onPage()
-      doc.font('Helvetica-Bold').fontSize(16).fillColor('#111111').text('Indice', { align: 'left' })
-      doc.moveDown(0.75)
-      doc.font('Helvetica').fontSize(11).fillColor('#000000')
-      for (const r of rules) {
-        doc.text(`${r.rule_number}. ${truncateLine(firstSentence(r.content), 90)}`)
-      }
+  let page = pdf.addPage([A4.width, A4.height])
+  let pageNo = 1
+  header(page, pageNo)
+  footer(page, pageNo)
 
-      // Sezione regole
-      doc.addPage()
-      onPage()
-      for (const r of rules) {
-        doc.save()
-        doc.roundedRect(doc.page.margins.left - 6, doc.y - 6, doc.page.width - doc.page.margins.left - doc.page.margins.right + 12, 28, 6).fill('#F7F7F7')
-        doc.restore()
-        doc.moveDown(-1.2)
-        doc.font('Helvetica-Bold').fontSize(14).fillColor('#111111').text(`${r.rule_number}. ${firstSentence(r.content)}`)
-        doc.moveDown(0.2)
-        doc.moveTo(doc.page.margins.left, doc.y).lineTo(doc.page.width - doc.page.margins.right, doc.y).lineWidth(0.5).stroke('#E6E6E6')
-        doc.moveDown(0.6)
-        doc.font('Helvetica').fontSize(12).fillColor('#111111').text(cleanContent(r.content), { align: 'justify', lineGap: 2 })
-        doc.moveDown(0.8)
-      }
+  let cursorY = A4.height - margin.top
+  const maxWidth = A4.width - margin.left - margin.right
 
-      doc.end()
-    } catch (err) {
-      reject(err)
+  const ensureSpace = (needed: number) => {
+    if (cursorY - needed < margin.bottom) {
+      page = pdf.addPage([A4.width, A4.height])
+      pageNo += 1
+      header(page, pageNo)
+      footer(page, pageNo)
+      cursorY = A4.height - margin.top
     }
-  })
+  }
+
+  const drawTitle = (text: string) => {
+    const size = 16
+    const height = helveticaBold.heightAtSize(size)
+    ensureSpace(height + 16)
+    page.drawText(text, { x: margin.left, y: cursorY, size, font: helveticaBold, color: rgb(0.07, 0.07, 0.07) })
+    cursorY -= height + 8
+  }
+
+  const drawParagraph = (text: string, size = 12, lineGap = 2, font = helvetica) => {
+    const words = text.replace(/\s+/g, ' ').trim().split(' ')
+    let line = ''
+    const lineHeight = font.heightAtSize(size) + lineGap
+    for (const word of words) {
+      const test = line ? line + ' ' + word : word
+      const w = font.widthOfTextAtSize(test, size)
+      if (w > maxWidth) {
+        ensureSpace(lineHeight)
+        page.drawText(line, { x: margin.left, y: cursorY, size, font, color: rgb(0.07, 0.07, 0.07) })
+        cursorY -= lineHeight
+        line = word
+      } else {
+        line = test
+      }
+    }
+    if (line) {
+      ensureSpace(lineHeight)
+      page.drawText(line, { x: margin.left, y: cursorY, size, font, color: rgb(0.07, 0.07, 0.07) })
+      cursorY -= lineHeight
+    }
+    cursorY -= lineGap
+  }
+
+  // Indice
+  drawTitle('Indice')
+  for (const r of rules) {
+    const preview = `${r.rule_number}. ${truncateLine(firstSentence(r.content), 90)}`
+    drawParagraph(preview, 11, 1, helvetica)
+  }
+
+  // Sezione regole
+  page = pdf.addPage([A4.width, A4.height])
+  pageNo += 1
+  header(page, pageNo)
+  footer(page, pageNo)
+  cursorY = A4.height - margin.top
+
+  for (const r of rules) {
+    // Titolo box
+    ensureSpace(30)
+    const title = `${r.rule_number}. ${firstSentence(r.content)}`
+    // background bar
+    page.drawRectangle({ x: margin.left - 6, y: cursorY - 6, width: maxWidth + 12, height: 24, color: rgb(0.97, 0.97, 0.97) })
+    page.drawText(title, { x: margin.left, y: cursorY, size: 14, font: helveticaBold, color: rgb(0.07, 0.07, 0.07) })
+    cursorY -= 28
+    // contenuto
+    drawParagraph(cleanContent(r.content), 12, 2, helvetica)
+    cursorY -= 6
+  }
+
+  const bytes = await pdf.save()
+  return Buffer.from(bytes)
 }
 
 function cleanContent(content: string): string {
