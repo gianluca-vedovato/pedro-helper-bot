@@ -317,8 +317,15 @@ ${rulesText}`
     temperature: 0.2,
     max_tokens: 4000
   })
-  const md = resp.choices?.[0]?.message?.content?.trim() || ''
-  return md || `# Regolamento\n\n${rules.map((r)=>`## Art. ${r.rule_number} — ${r.content.split(/\.|\n/)[0] || ''}\n\n${r.content}`).join('\n\n')}`
+  let md = resp.choices?.[0]?.message?.content?.trim() || ''
+  // Rimuovi eventuali code fences (```markdown ... ```)
+  md = md.replace(/^```[a-zA-Z]*\n/, '').replace(/\n```\s*$/, '').trim()
+  if (!md) {
+    md = `# Regolamento\n\n${rules
+      .map((r) => `## Art. ${r.rule_number} — ${(r.content.split(/\.|\n/)[0] || '').trim()}\n\n${r.content}`)
+      .join('\n\n')}`
+  }
+  return md
 }
 
 function safeParse(input?: string | null): any {

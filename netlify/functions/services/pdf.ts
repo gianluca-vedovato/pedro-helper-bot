@@ -147,10 +147,10 @@ async function generateRulesPdfBufferFromMarkdown(markdown: string): Promise<Buf
       cursorY = A4.height - margin.top
     }
   }
-  const drawLine = (text: string, size: number, font: any) => {
+  const drawLine = (text: string, size: number, font: any, extraGap = 0) => {
     const words = text.split(/\s+/)
     let line = ''
-    const lh = font.heightAtSize(size) + 2
+    const lh = font.heightAtSize(size) + 4 // interlinea maggiore
     for (const w of words) {
       const t = line ? line + ' ' + w : w
       if (font.widthOfTextAtSize(t, size) > maxWidth) {
@@ -167,6 +167,7 @@ async function generateRulesPdfBufferFromMarkdown(markdown: string): Promise<Buf
       page.drawText(line, { x: margin.left, y: cursorY, size, font })
       cursorY -= lh
     }
+    if (extraGap) cursorY -= extraGap
   }
 
   const lines = markdown.split(/\r?\n/)
@@ -183,15 +184,15 @@ async function generateRulesPdfBufferFromMarkdown(markdown: string): Promise<Buf
     if (line.startsWith('# ')) {
       const text = line.replace(/^#\s+/, '')
       ensure(22)
-      drawLine(text, 18, serifBold)
+      drawLine(text, 18, serifBold, 4)
       i++
       continue
     }
     if (line.startsWith('## ')) {
       const text = line.replace(/^##\s+/, '')
-      cursorY -= 6
-      drawLine(text, 14, serifBold)
-      cursorY -= 2
+      cursorY -= 8
+      drawLine(text, 14, serifBold, 2)
+      cursorY -= 4
       i++
       continue
     }
@@ -206,7 +207,7 @@ async function generateRulesPdfBufferFromMarkdown(markdown: string): Promise<Buf
         const text = item.replace(/^[-*]\s+/, '• ')
         drawLine(text, 12, serif)
       }
-      cursorY -= 2
+      cursorY -= 4
       continue
     }
     // Liste numerate
@@ -219,11 +220,11 @@ async function generateRulesPdfBufferFromMarkdown(markdown: string): Promise<Buf
       for (const item of block) {
         drawLine(item, 12, serif)
       }
-      cursorY -= 2
+      cursorY -= 4
       continue
     }
     // Paragrafo
-    drawLine(line, 12, serif)
+    drawLine(line, 12, serif, 2)
     cursorY -= 2
     i++
   }
