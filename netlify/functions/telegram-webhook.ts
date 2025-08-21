@@ -331,25 +331,37 @@ function ensureBot() {
     bot.on('callback_query', async (ctx) => {
       try {
         const data = String((ctx.callbackQuery as any)?.data || '')
-        if (!data.startsWith('applica_poll:')) return ctx.answerCbQuery()
+        if (!data.startsWith('applica_poll:')) {
+          try { await ctx.answerCbQuery() } catch {}
+          return
+        }
+
+        // Rispondi SUBITO per evitare timeout del callback_query
+        try { await ctx.answerCbQuery('⏳ Elaboro...') } catch (ackErr) {
+          console.warn('answerCbQuery fallita (ignoro):', ackErr)
+        }
+
         const pollId = data.split(':')[1]
         const chatId = ctx.chat?.id as number
         const userId = ctx.from?.id as number
         const isAdmin = await userIsAdmin(ctx, chatId, userId)
         if (!isAdmin) {
-          await ctx.answerCbQuery('Solo gli amministratori possono applicare.', { show_alert: true })
+          await ctx.reply('❌ Solo gli amministratori possono applicare i risultati.')
           return
         }
-        await ctx.answerCbQuery('Applico il sondaggio...')
+
         const snapshot = await pollGetById(pollId)
-        if (!snapshot) return ctx.reply('❌ Sondaggio non trovato nei registri.')
+        if (!snapshot) {
+          await ctx.reply('❌ Sondaggio non trovato nei registri.')
+          return
+        }
         const rules = await rulesGetAll()
         const rulesText = (rules as any[]).map((r) => `${r.rule_number}. ${r.content}`).join('\n\n')
         const result = await applyPollToRules({ pollId, question: snapshot.question, options: snapshot.options, rulesText })
         await ctx.reply(result.summary)
       } catch (e) {
         console.error('Errore callback applica_poll:', e)
-        await ctx.answerCbQuery('Errore durante l\'applicazione.', { show_alert: true })
+        try { await ctx.answerCbQuery('Errore durante l\'applicazione.', { show_alert: true }) } catch {}
       }
     })
 
