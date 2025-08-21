@@ -205,10 +205,10 @@ function ensureBot() {
         const isAdmin = await userIsAdmin(ctx, chatId, userId)
         if (!isAdmin) return ctx.reply('❌ Solo gli amministratori possono rigenerare il PDF.')
         const processing = await ctx.reply('🔄 Rigenero il PDF del regolamento...')
-        const res = await rebuildAndUploadRulesPdf()
+        const res = await rebuildAndUploadRulesPdf({ force: 'html' })
         await ctx.telegram.deleteMessage(chatId, (processing as any).message_id)
         if (!res.ok) return ctx.reply(`❌ Errore rigenerazione PDF: ${res.error || 'sconosciuto'}`)
-        return ctx.reply(`✅ PDF rigenerato. Link: ${res.url}`)
+        return ctx.reply(`✅ PDF rigenerato (${res.renderer}). Link: ${res.url}?t=${Date.now()}`)
       } catch (e) {
         console.error('Errore rigenera_regolamento:', e)
         return ctx.reply('❌ Errore durante la rigenerazione del PDF.')

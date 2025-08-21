@@ -4,12 +4,27 @@ import puppeteer from 'puppeteer-core'
 import { rulesGetAll, getSupabase } from './db'
 import MarkdownIt from 'markdown-it'
 
-export async function rebuildAndUploadRulesPdf(): Promise<{ ok: boolean; url?: string; error?: string }> {
+export async function rebuildAndUploadRulesPdf(options?: { force?: 'html' | 'fallback' }): Promise<{ ok: boolean; url?: string; error?: string; renderer?: 'html' | 'fallback' }> {
   try {
     const rules = await rulesGetAll()
     if (!rules.length) return { ok: false, error: 'Nessuna regola presente' }
-    // Prefer HTML-to-PDF for migliore qualità
-    const buffer = await tryGenerateRulesPdfHtml(rules as any[]) || await generateRulesPdfBuffer(rules as any[])
+    // Prefer HTML-to-PDF per migliore qualità
+    let renderer: 'html' | 'fallback' = 'html'
+    let buffer: Buffer | null = null
+    if (options?.force !== 'fallback') {
+      const htmlRes = await tryGenerateRulesPdfHtml(rules as any[])
+      if (htmlRes && htmlRes.buffer) {
+        buffer = htmlRes.buffer
+        console.log('PDF: HTML renderer OK', { mdLength: htmlRes.mdLength, htmlLength: htmlRes.htmlLength })
+      } else if (options?.force === 'html') {
+        return { ok: false, error: 'HTML renderer non disponibile', renderer: 'html' }
+      }
+    }
+    if (!buffer) {
+      renderer = 'fallback'
+      buffer = await generateRulesPdfBuffer(rules as any[])
+      console.log('PDF: fallback renderer usato (pdf-lib)')
+    }
     const client = getSupabase()
     if (!client) return { ok: false, error: 'Supabase non configurato' }
     const bucket = process.env.SUPABASE_BUCKET || 'assets'
@@ -25,7 +40,7 @@ export async function rebuildAndUploadRulesPdf(): Promise<{ ok: boolean; url?: s
     })
     if (error) return { ok: false, error: error.message }
     const { data } = client.storage.from(bucket).getPublicUrl(path)
-    return { ok: true, url: data.publicUrl }
+    return { ok: true, url: data.publicUrl, renderer }
   } catch (e: any) {
     return { ok: false, error: e?.message || 'Errore sconosciuto' }
   }
@@ -128,7 +143,7 @@ export async function generateRulesPdfBuffer(rules: { rule_number: number; conte
   return Buffer.from(bytes)
 }
 
-async function tryGenerateRulesPdfHtml(rules: { rule_number: number; content: string }[]): Promise<Buffer | null> {
+async function tryGenerateRulesPdfHtml(rules: { rule_number: number; content: string }[]): Promise<{ buffer: Buffer | null; mdLength: number; htmlLength: number }> {
   try {
     const executablePath = await chromium.executablePath()
     const browser = await puppeteer.launch({
@@ -138,8 +153,8 @@ async function tryGenerateRulesPdfHtml(rules: { rule_number: number; content: st
       headless: chromium.headless
     })
     const page = await browser.newPage()
-    const html = await buildHtmlFromMarkdown(rules)
-    await page.setContent(html, { waitUntil: 'networkidle0' })
+    const built = await buildHtmlFromMarkdown(rules)
+    await page.setContent(built.html, { waitUntil: 'networkidle0' })
     // small layout settle
     await page.waitForTimeout(50)
     const pdf = await page.pdf({
@@ -151,18 +166,18 @@ async function tryGenerateRulesPdfHtml(rules: { rule_number: number; content: st
       footerTemplate: htmlHeaderFooter('footer')
     })
     await browser.close()
-    return Buffer.from(pdf)
+    return { buffer: Buffer.from(pdf), mdLength: built.md.length, htmlLength: built.html.length }
   } catch {
-    return null
+    return { buffer: null, mdLength: 0, htmlLength: 0 }
   }
 }
 
-async function buildHtmlFromMarkdown(rules: { rule_number: number; content: string }[]): Promise<string> {
+async function buildHtmlFromMarkdown(rules: { rule_number: number; content: string }[]): Promise<{ html: string; md: string }> {
   const mdBuilder = new MarkdownIt({ html: false, linkify: false, typographer: true })
   const openaiMd = await (await import('./ai')).buildRegulationMarkdown(rules)
   const contentHtml = mdBuilder.render(openaiMd)
   const now = new Date().toLocaleString('it-IT')
-  return `<!doctype html>
+  const html = `<!doctype html>
 <html lang="it">
 <head>
   <meta charset="utf-8" />
@@ -188,6 +203,7 @@ async function buildHtmlFromMarkdown(rules: { rule_number: number; content: stri
   <main class="doc">${contentHtml}</main>
 </body>
 </html>`
+  return { html, md: openaiMd }
 }
 
 function htmlHeaderFooter(kind: 'header'|'footer'): string {
