@@ -1,4 +1,6 @@
+// Importazione che forza l'inclusione dei dati font standard in ambienti serverless
 import PDFDocument from 'pdfkit'
+import 'pdfkit/js/data' // hint per bundler: includi i font standard
 import { rulesGetAll } from './services/db'
 
 export async function handler(event: any) {

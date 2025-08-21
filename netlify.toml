@@ -9,10 +9,14 @@
 
 [functions."telegram-webhook"]
   node_bundler = "esbuild"
-  external_node_modules = ["@supabase/supabase-js"]
+  external_node_modules = ["@supabase/supabase-js", "pdfkit"]
 
 [functions."telegram-webhook-local"]
   node_bundler = "esbuild"
+
+[functions."rules-pdf"]
+  node_bundler = "esbuild"
+  external_node_modules = ["@supabase/supabase-js", "pdfkit"]
 
 
 [[redirects]]
