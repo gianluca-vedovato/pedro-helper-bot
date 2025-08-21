@@ -1,6 +1,5 @@
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib'
-import chromium from '@sparticuz/chromium'
-import puppeteer from 'puppeteer-core'
+// Rimosso Chrome per compatibilità Netlify; usiamo markdown-it + pdf-lib
 import { rulesGetAll, getSupabase } from './db'
 import MarkdownIt from 'markdown-it'
 
@@ -8,23 +7,10 @@ export async function rebuildAndUploadRulesPdf(options?: { force?: 'html' | 'fal
   try {
     const rules = await rulesGetAll()
     if (!rules.length) return { ok: false, error: 'Nessuna regola presente' }
-    // Prefer HTML-to-PDF per migliore qualità
-    let renderer: 'html' | 'fallback' = 'html'
-    let buffer: Buffer | null = null
-    if (options?.force !== 'fallback') {
-      const htmlRes = await tryGenerateRulesPdfHtml(rules as any[])
-      if (htmlRes && htmlRes.buffer) {
-        buffer = htmlRes.buffer
-        console.log('PDF: HTML renderer OK', { mdLength: htmlRes.mdLength, htmlLength: htmlRes.htmlLength })
-      } else if (options?.force === 'html') {
-        return { ok: false, error: 'HTML renderer non disponibile', renderer: 'html' }
-      }
-    }
-    if (!buffer) {
-      renderer = 'fallback'
-      buffer = await generateRulesPdfBuffer(rules as any[])
-      console.log('PDF: fallback renderer usato (pdf-lib)')
-    }
+    // Genera Markdown e renderizza con pdf-lib (compatibile serverless)
+    const md = await (await import('./ai')).buildRegulationMarkdown(rules as any[])
+    const buffer = await generateRulesPdfBufferFromMarkdown(md)
+    const renderer: 'html' | 'fallback' = 'fallback'
     const client = getSupabase()
     if (!client) return { ok: false, error: 'Supabase non configurato' }
     const bucket = process.env.SUPABASE_BUCKET || 'assets'
@@ -143,68 +129,107 @@ export async function generateRulesPdfBuffer(rules: { rule_number: number; conte
   return Buffer.from(bytes)
 }
 
-async function tryGenerateRulesPdfHtml(rules: { rule_number: number; content: string }[]): Promise<{ buffer: Buffer | null; mdLength: number; htmlLength: number }> {
-  try {
-    const executablePath = await chromium.executablePath()
-    const browser = await puppeteer.launch({
-      args: chromium.args,
-      defaultViewport: chromium.defaultViewport,
-      executablePath,
-      headless: chromium.headless
-    })
-    const page = await browser.newPage()
-    const built = await buildHtmlFromMarkdown(rules)
-    await page.setContent(built.html, { waitUntil: 'networkidle0' })
-    // small layout settle
-    await page.waitForTimeout(50)
-    const pdf = await page.pdf({
-      printBackground: true,
-      format: 'A4',
-      margin: { top: '20mm', right: '18mm', bottom: '20mm', left: '18mm' },
-      displayHeaderFooter: true,
-      headerTemplate: htmlHeaderFooter('header'),
-      footerTemplate: htmlHeaderFooter('footer')
-    })
-    await browser.close()
-    return { buffer: Buffer.from(pdf), mdLength: built.md.length, htmlLength: built.html.length }
-  } catch (e) {
-    console.error('PDF HTML renderer errore:', e)
-    return { buffer: null, mdLength: 0, htmlLength: 0 }
-  }
-}
+// Parser minimale Markdown → blocchi per pdf-lib (titoli, liste, paragrafi)
+async function generateRulesPdfBufferFromMarkdown(markdown: string): Promise<Buffer> {
+  const pdf = await PDFDocument.create()
+  const serif = await pdf.embedFont(StandardFonts.TimesRoman)
+  const serifBold = await pdf.embedFont(StandardFonts.TimesRomanBold)
+  const A4 = { width: 595.28, height: 841.89 }
+  const margin = { top: 64, bottom: 64, left: 56, right: 56 }
 
-async function buildHtmlFromMarkdown(rules: { rule_number: number; content: string }[]): Promise<{ html: string; md: string }> {
-  const mdBuilder = new MarkdownIt({ html: false, linkify: false, typographer: true })
-  const openaiMd = await (await import('./ai')).buildRegulationMarkdown(rules)
-  const contentHtml = mdBuilder.render(openaiMd)
-  const now = new Date().toLocaleString('it-IT')
-  const html = `<!doctype html>
-<html lang="it">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <style>
-    @page { size: A4; margin: 20mm 18mm; }
-    body { font-family: 'Times New Roman', Times, serif; color: #111; }
-    .title { text-align: center; font-size: 20px; font-weight: 700; margin: 0 0 8px; letter-spacing: 0.2px; }
-    .subtitle { text-align: center; font-size: 12px; color: #666; margin: 0 0 18px; }
-    .hr { height: 1px; background: #e5e5e5; margin: 12px 0 22px; }
-    h1 { font-size: 18px; margin: 0 0 10px; font-weight: 700; text-align: center; }
-    h2 { font-size: 14px; margin: 18px 0 8px; font-weight: 700; }
-    .num { color: #111; font-weight: 700; }
-    .rule .content, p, li { line-height: 1.5; text-align: justify; }
-    ul, ol { padding-left: 18px; }
-  </style>
-  <title>Regolamento</title>
-  </head>
-<body>
-  <div class="title">Regolamento</div>
-  <div class="subtitle">Versione aggiornata • Generato il ${now}</div>
-  <div class="hr"></div>
-  <main class="doc">${contentHtml}</main>
-</body>
-</html>`
-  return { html, md: openaiMd }
+  let page = pdf.addPage([A4.width, A4.height])
+  let cursorY = A4.height - margin.top
+  const maxWidth = A4.width - margin.left - margin.right
+
+  const ensure = (h: number) => {
+    if (cursorY - h < margin.bottom) {
+      page = pdf.addPage([A4.width, A4.height])
+      cursorY = A4.height - margin.top
+    }
+  }
+  const drawLine = (text: string, size: number, font: any) => {
+    const words = text.split(/\s+/)
+    let line = ''
+    const lh = font.heightAtSize(size) + 2
+    for (const w of words) {
+      const t = line ? line + ' ' + w : w
+      if (font.widthOfTextAtSize(t, size) > maxWidth) {
+        ensure(lh)
+        page.drawText(line, { x: margin.left, y: cursorY, size, font })
+        cursorY -= lh
+        line = w
+      } else {
+        line = t
+      }
+    }
+    if (line) {
+      ensure(lh)
+      page.drawText(line, { x: margin.left, y: cursorY, size, font })
+      cursorY -= lh
+    }
+  }
+
+  const lines = markdown.split(/\r?\n/)
+  let i = 0
+  while (i < lines.length) {
+    const raw = lines[i]
+    const line = raw.trimEnd()
+    if (!line.trim()) {
+      cursorY -= 4
+      i++
+      continue
+    }
+    // H1 / H2
+    if (line.startsWith('# ')) {
+      const text = line.replace(/^#\s+/, '')
+      ensure(22)
+      drawLine(text, 18, serifBold)
+      i++
+      continue
+    }
+    if (line.startsWith('## ')) {
+      const text = line.replace(/^##\s+/, '')
+      cursorY -= 6
+      drawLine(text, 14, serifBold)
+      cursorY -= 2
+      i++
+      continue
+    }
+    // Liste puntate
+    if (line.match(/^[-*]\s+/)) {
+      let block: string[] = []
+      while (i < lines.length && lines[i].match(/^[-*]\s+/)) {
+        block.push(lines[i])
+        i++
+      }
+      for (const item of block) {
+        const text = item.replace(/^[-*]\s+/, '• ')
+        drawLine(text, 12, serif)
+      }
+      cursorY -= 2
+      continue
+    }
+    // Liste numerate
+    if (line.match(/^\d+\.\s+/)) {
+      let block: string[] = []
+      while (i < lines.length && lines[i].match(/^\d+\.\s+/)) {
+        block.push(lines[i])
+        i++
+      }
+      for (const item of block) {
+        drawLine(item, 12, serif)
+      }
+      cursorY -= 2
+      continue
+    }
+    // Paragrafo
+    drawLine(line, 12, serif)
+    cursorY -= 2
+    i++
+  }
+
+  const bytes = await pdf.save()
+  return Buffer.from(bytes)
 }
 
 function htmlHeaderFooter(kind: 'header'|'footer'): string {
