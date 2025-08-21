@@ -14,8 +14,10 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",
+    "@sparticuz/chromium": "^124.0.0",
     "dotenv": "^17.2.1",
     "pdf-lib": "^1.17.1",
+    "puppeteer-core": "^23.5.0",
     "openai": "^4.52.0",
     "telegraf": "^4.16.3"
   },
