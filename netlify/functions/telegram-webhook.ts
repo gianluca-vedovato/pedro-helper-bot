@@ -7,6 +7,7 @@ import { getSupabase, rulesGetAll, rulesUpsert, rulesDelete, rulesNextNumber } f
 import { pollsUpsert, pollGetById } from './services/db'
 
 const BOT_TOKEN = process.env.BOT_TOKEN
+const ASKPEDRO_PROMPT_PREFIX = '✍️ Scrivi la tua domanda sul regolamento rispondendo a questo messaggio.'
 
 let bot: Telegraf<Context> | null = null
 
@@ -23,12 +24,12 @@ function ensureBot() {
 
     bot.start(async (ctx) => {
       console.log('🚀 Comando /start ricevuto')
-      await ctx.reply('Ciao! Sono Pedro (Node). Comandi:\n/regolamento [n]\n/askpedro [domanda]\n/promemoria, /promemoria_lista, /promemoria_cancella\n/crea_regola [tema], /cancella_regola')
+      await ctx.reply('Ciao! Sono Pedro (Node). Comandi:\n/regolamento [n]\n/askpedro → poi rispondi con la domanda\n/promemoria, /promemoria_lista, /promemoria_cancella\n/crea_regola [tema], /cancella_regola')
     })
 
     bot.help(async (ctx) => {
       console.log('❓ Comando /help ricevuto')
-      await ctx.reply('Comandi:\n/start\n/help\n/regolamento [numero]\n/askpedro [domanda]\n/promemoria <testo>\n/promemoria_lista\n/promemoria_cancella <id>\n/crea_regola <tema>\n/cancella_regola <numero>')
+      await ctx.reply('Comandi:\n/start\n/help\n/regolamento [numero]\n/askpedro → invia il comando e RISPOSTI con la domanda\n/promemoria <testo>\n/promemoria_lista\n/promemoria_cancella <id>\n/crea_regola <tema>\n/cancella_regola <numero>')
     })
 
     bot.command('regolamento', async (ctx) => {
@@ -58,7 +59,12 @@ function ensureBot() {
     bot.command('askpedro', async (ctx) => {
       console.log('🤖 Comando /askpedro ricevuto')
       const q = (ctx.message?.text || '').split(' ').slice(1).join(' ').trim()
-      if (!q) return ctx.reply('❌ Uso: /askpedro [domanda]')
+      if (!q) {
+        await ctx.reply(`${ASKPEDRO_PROMPT_PREFIX}\n\nEsempio: "Come funzionano i cambi?"`, {
+          reply_markup: { force_reply: true }
+        })
+        return
+      }
       const rules = await rulesGetAll()
       if (!rules.length) return ctx.reply('❌ Nessuna regola caricata.')
       const rulesText = (rules as any[]).map((r) => `${r.rule_number}. ${r.content}`).join('\n\n')
@@ -236,6 +242,29 @@ function ensureBot() {
         await ctx.reply(text)
       } catch (e) {
         console.error('Errore gestione messaggio sondaggio:', e)
+      }
+    })
+
+    // ======== RISPOSTA ALLA PROMPT /ASKPEDRO ========
+    bot.on('text', async (ctx) => {
+      try {
+        const msg: any = ctx.message
+        if (!msg || !msg.text) return
+        const replied: any = msg.reply_to_message
+        const repliedText = String(replied?.text || '')
+        const repliedFromIsBot = Boolean(replied?.from?.is_bot)
+        if (!replied || !repliedFromIsBot) return
+        if (!repliedText.startsWith(ASKPEDRO_PROMPT_PREFIX)) return
+
+        const q = String(msg.text || '').trim()
+        if (!q) return
+        const rules = await rulesGetAll()
+        if (!rules.length) return ctx.reply('❌ Nessuna regola caricata.')
+        const rulesText = (rules as any[]).map((r) => `${r.rule_number}. ${r.content}`).join('\n\n')
+        const answer = await askAboutRules(q, rulesText)
+        await ctx.reply(answer, { parse_mode: 'Markdown' })
+      } catch (e) {
+        console.error('Errore gestione risposta askpedro:', e)
       }
     })
 
