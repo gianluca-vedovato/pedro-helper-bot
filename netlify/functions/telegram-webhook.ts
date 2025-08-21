@@ -222,9 +222,9 @@ function ensureBot() {
     })
 
     // ======== SONDAGGI ========
-    bot.on('message', async (ctx) => {
+    bot.on('message', async (ctx, next) => {
       const msg: any = ctx.message
-      if (!msg || !msg.poll) return
+      if (!msg || !msg.poll) return next()
       try {
         const poll = msg.poll
         const chatId = ctx.chat?.id as number
