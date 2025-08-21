@@ -47,7 +47,9 @@ function ensureBot() {
       // Invia direttamente il link al PDF servito via Function HTTP
       const baseUrl = process.env.SITE_URL || process.env.URL || ''
       const supaUrl = process.env.SUPABASE_URL || ''
-      const publicPdf = supaUrl ? `${supaUrl.replace(/\/$/, '')}/storage/v1/object/public/assets/regolamento.pdf` : ''
+      const bucket = process.env.SUPABASE_BUCKET || 'assets'
+      const pdfPath = process.env.SUPABASE_RULES_PDF_PATH || 'regolamento.pdf'
+      const publicPdf = supaUrl ? `${supaUrl.replace(/\/$/, '')}/storage/v1/object/public/${bucket}/${pdfPath}` : ''
       const link = publicPdf || (baseUrl ? `${baseUrl.replace(/\/$/, '')}/regolamento.pdf` : '/regolamento.pdf')
       await ctx.reply(`📄 Scarica il PDF del regolamento: ${link}`)
     })

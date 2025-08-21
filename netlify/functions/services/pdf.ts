@@ -11,8 +11,8 @@ export async function rebuildAndUploadRulesPdf(): Promise<{ ok: boolean; url?: s
     const buffer = await tryGenerateRulesPdfHtml(rules as any[]) || await generateRulesPdfBuffer(rules as any[])
     const client = getSupabase()
     if (!client) return { ok: false, error: 'Supabase non configurato' }
-    const bucket = 'assets'
-    const path = 'regolamento.pdf'
+    const bucket = process.env.SUPABASE_BUCKET || 'assets'
+    const path = process.env.SUPABASE_RULES_PDF_PATH || 'regolamento.pdf'
     const { error } = await client.storage.from(bucket).upload(path, buffer, {
       contentType: 'application/pdf',
       upsert: true

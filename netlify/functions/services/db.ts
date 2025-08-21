@@ -6,7 +6,8 @@ let supabase: SupabaseClient | null = null
 export function getSupabase(): SupabaseClient | null {
   if (supabase) return supabase
   const url = process.env.SUPABASE_URL
-  const key = process.env.SUPABASE_ANON_KEY
+  // Preferisci la service role key lato server, fallback ad anon key
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY
   if (!url || !key) return null
   supabase = createClient(url, key)
   return supabase
