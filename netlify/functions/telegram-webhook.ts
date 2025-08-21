@@ -1,4 +1,5 @@
 import { Telegraf } from 'telegraf'
+import PDFDocument from 'pdfkit'
 import type { Context } from 'telegraf'
 import { askAboutRules, applyPollToRules, generateRuleContent } from './services/ai'
 import { getSupabase, rulesGetAll, rulesUpsert, rulesDelete, rulesNextNumber } from './services/db'
@@ -41,9 +42,22 @@ function ensureBot() {
         if (!found) return ctx.reply(`❌ Regola ${n} non trovata.`)
         return ctx.reply(`📋 Regola ${n}:\n\n${formatRule(found.content)}`, { parse_mode: 'Markdown' })
       }
-      let resp = '📚 Regolamento Completo:\n\n'
-      for (const r of rules as any[]) resp += `**${r.rule_number}.** ${formatRule(r.content)}\n\n`
-      for (let i = 0; i < resp.length; i += 4096) await ctx.reply(resp.slice(i, i + 4096), { parse_mode: 'Markdown' })
+
+      // Genera PDF al volo e invialo come documento
+      try {
+        const buffer = await generateRulesPdfBuffer(rules as any[])
+        const fileName = `Regolamento_Fantacalcio_${new Date().toISOString().slice(0,10)}.pdf`
+        await ctx.replyWithDocument(
+          { source: buffer, filename: fileName },
+          { caption: '📚 Regolamento completo (PDF)\n🔄 Aggiornato automaticamente ad ogni richiesta' }
+        )
+      } catch (e) {
+        console.error('Errore generazione PDF regolamento:', e)
+        // Fallback: invia link alla versione testo nel caso PDF fallisca
+        let resp = '📚 Regolamento Completo:\n\n'
+        for (const r of rules as any[]) resp += `**${r.rule_number}.** ${formatRule(r.content)}\n\n`
+        for (let i = 0; i < resp.length; i += 4096) await ctx.reply(resp.slice(i, i + 4096), { parse_mode: 'Markdown' })
+      }
     })
 
     bot.command('askpedro', async (ctx) => {
@@ -306,6 +320,107 @@ function ensureBot() {
 
 function formatRule(content: string): string {
   return content.replace(/\*\*/g, '**').replace(/\n/g, '\n')
+}
+
+async function generateRulesPdfBuffer(rules: { rule_number: number; content: string }[]): Promise<Buffer> {
+  return await new Promise<Buffer>((resolve, reject) => {
+    try {
+      const doc = new PDFDocument({ size: 'A4', margins: { top: 64, bottom: 64, left: 56, right: 56 } })
+      const chunks: Buffer[] = []
+      doc.on('data', (d: Buffer) => chunks.push(d))
+      doc.on('error', reject)
+      doc.on('end', () => resolve(Buffer.concat(chunks)))
+
+      // Metadati documento
+      const generatedAt = new Date()
+      doc.info = {
+        Title: 'Regolamento Fantacalcio',
+        Author: 'Pedro Bot',
+        Subject: 'Regolamento ufficiale del Fantacalcio del gruppo',
+        Keywords: 'fantacalcio, regolamento, regole, pedro bot',
+        CreationDate: generatedAt as unknown as Date,
+        ModDate: generatedAt as unknown as Date
+      } as any
+
+      // Helpers per header/footer su ogni pagina
+      const drawHeader = () => {
+        const top = doc.page.margins.top - 36
+        doc.save()
+        doc.font('Helvetica-Bold').fontSize(10).fillColor('#333333')
+        doc.text('Regolamento Fantacalcio', doc.page.margins.left, top, { align: 'left' })
+        doc.moveTo(doc.page.margins.left, top + 16).lineTo(doc.page.width - doc.page.margins.right, top + 16).lineWidth(0.5).stroke('#DDDDDD')
+        doc.restore()
+      }
+      const drawFooter = () => {
+        const y = doc.page.height - doc.page.margins.bottom + 24
+        doc.save()
+        doc.moveTo(doc.page.margins.left, y - 10).lineTo(doc.page.width - doc.page.margins.right, y - 10).lineWidth(0.5).stroke('#EEEEEE')
+        doc.font('Helvetica').fontSize(9).fillColor('#666666')
+        // pdfkit non espone il numero pagina tipizzato; lo calcoliamo tenendo un contatore manuale
+        const pageNo = (doc as any)._pageBuffer?.length ? (doc as any)._pageBuffer.length + 1 : 1
+        doc.text(`Pagina ${pageNo}`, doc.page.margins.left, y, { width: doc.page.width - doc.page.margins.left - doc.page.margins.right, align: 'right' })
+        doc.restore()
+      }
+      const onPage = () => {
+        drawHeader()
+        drawFooter()
+      }
+      doc.on('pageAdded', onPage)
+
+      // Prima pagina: Indice semplice (senza copertina)
+      onPage()
+      doc.font('Helvetica-Bold').fontSize(16).fillColor('#111111').text('Indice', { align: 'left' })
+      doc.moveDown(0.75)
+      doc.font('Helvetica').fontSize(11).fillColor('#000000')
+      for (const r of rules) {
+        doc.text(`${r.rule_number}. ${truncateLine(firstSentence(r.content), 90)}`)
+      }
+
+      // Sezione regole
+      doc.addPage()
+      onPage()
+      for (const r of rules) {
+        // Titolo regola
+        doc.save()
+        doc.roundedRect(doc.page.margins.left - 6, doc.y - 6, doc.page.width - doc.page.margins.left - doc.page.margins.right + 12, 28, 6).fill('#F7F7F7')
+        doc.restore()
+        doc.moveDown(-1.2)
+        doc.font('Helvetica-Bold').fontSize(14).fillColor('#111111').text(`${r.rule_number}. ${firstSentence(r.content)}`)
+        doc.moveDown(0.2)
+        doc.moveTo(doc.page.margins.left, doc.y).lineTo(doc.page.width - doc.page.margins.right, doc.y).lineWidth(0.5).stroke('#E6E6E6')
+        doc.moveDown(0.6)
+
+        // Testo regola
+        doc.font('Helvetica').fontSize(12).fillColor('#111111').text(cleanContent(r.content), {
+          align: 'justify',
+          lineGap: 2
+        })
+        doc.moveDown(0.8)
+      }
+
+      doc.end()
+    } catch (err) {
+      reject(err)
+    }
+  })
+}
+
+function cleanContent(content: string): string {
+  // rimuove marcatori markdown basilari
+  return String(content || '')
+    .replace(/\*\*(.*?)\*\*/g, '$1')
+    .replace(/__([^_]+)__/g, '$1')
+}
+
+function firstSentence(content: string): string {
+  const text = cleanContent(content).trim()
+  const m = text.match(/^[^.?!\n]{3,}([.?!]|\n)/)
+  return m ? m[0].replace(/[\n]+/g, ' ').trim() : truncateLine(text, 120)
+}
+
+function truncateLine(text: string, max: number): string {
+  const t = String(text || '').replace(/[\n\r]+/g, ' ').trim()
+  return t.length > max ? t.slice(0, max - 1) + '…' : t
 }
 
 function buildPollRegisteredText(pollId: string, question: string, options: { text: string; voter_count: number }[]): string {
