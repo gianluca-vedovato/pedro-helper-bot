@@ -290,6 +290,76 @@ function ensureBot() {
       }
     });
 
+    // ======== MODALITÀ INLINE (@bot askpedro) ========
+    bot.on("inline_query", async (ctx) => {
+      const query = (ctx.inlineQuery?.query || "").trim();
+      if (!query) {
+        await ctx.answerInlineQuery([], {
+          cache_time: 0,
+          switch_pm_text: "Scrivi una domanda per chiedere a Pedro",
+          switch_pm_parameter: "askpedro",
+        });
+        return;
+      }
+      try {
+        const rules = await rulesGetAll();
+        if (!rules.length) {
+          await ctx.answerInlineQuery(
+            [
+              {
+                type: "article",
+                id: "no-rules",
+                title: "Nessuna regola caricata",
+                description: "Il regolamento non è ancora disponibile",
+                input_message_content: {
+                  message_text: "❌ Nessuna regola caricata nel bot.",
+                },
+              },
+            ],
+            { cache_time: 0 }
+          );
+          return;
+        }
+        const rulesText = (rules as any[])
+          .map((r) => `${r.rule_number}. ${r.content}`)
+          .join("\n\n");
+        const answer = await askAboutRules(query, rulesText);
+        const preview =
+          answer.length > 100 ? answer.slice(0, 97) + "…" : answer;
+        await ctx.answerInlineQuery(
+          [
+            {
+              type: "article",
+              id: `ask-${Date.now()}`,
+              title: `Pedro: ${query.slice(0, 50)}${query.length > 50 ? "…" : ""}`,
+              description: preview,
+              input_message_content: {
+                message_text: `❓ *${query}*\n\n${answer}`,
+                parse_mode: "Markdown",
+              },
+            },
+          ],
+          { cache_time: 60 }
+        );
+      } catch (e) {
+        console.error("Errore inline_query:", e);
+        await ctx.answerInlineQuery(
+          [
+            {
+              type: "article",
+              id: "error",
+              title: "Errore",
+              description: "Riprova tra poco",
+              input_message_content: {
+                message_text: "❌ Errore nel recuperare la risposta. Riprova.",
+              },
+            },
+          ],
+          { cache_time: 0 }
+        );
+      }
+    });
+
     bot.command("rigenera_regolamento", async (ctx) => {
       try {
         const chatId = ctx.chat?.id as number;
