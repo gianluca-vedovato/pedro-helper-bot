@@ -1,0 +1,106 @@
+[
+  {
+    "rule_number": 1,
+    "content": "Budget Disponibile: Ogni partecipante al fantacalcio avrà a disposizione un budget di 500 fantamilioni per la composizione della propria squadra."
+  },
+  {
+    "rule_number": 2,
+    "content": "Modalità dell'Asta: L'asta si terrà venerdì 30 agosto 2025 alle ore 14:30. A seguire, cena fuori per commentare le rose.\nIl mercato iniziale si svolgerà a buste, anziché con asta a chiamata. La rosa di ogni squadra dovrà essere composta da:\nUn pacchetto di portieri\n- 8 difensori\n- 8 centrocampisti\n- 6 attaccanti"
+  },
+  {
+    "rule_number": 3,
+    "content": "Acquisto dei Portieri: L'acquisto dei portieri avverrà per pacchetto, ovvero sarà possibile acquistare l'intero pacchetto dei portieri di una squadra. In caso di trasferimento di un portiere a un'altra squadra, il pacchetto resterà invariato senza possibilità di conguaglio economico."
+  },
+  {
+    "rule_number": 4,
+    "content": "Superamento del Budget: Nel caso in cui un partecipante superi il budget assegnato, verrà applicata una penalizzazione di 3 punti in classifica per ogni milione eccedente, fino a un massimo di 15 milioni."
+  },
+  {
+    "rule_number": 5,
+    "content": "Comportamento durante l'Asta: Durante l'asta, è obbligatorio limitarsi a parlare unicamente per proporre la propria offerta. Qualsiasi cifra pronunciata ad alta voce, anche in tono scherzoso, sarà considerata un'offerta ufficiale."
+  },
+  {
+    "rule_number": 6,
+    "content": "Sistema di Punteggio: - Goal: +3 punti\n- Assist: +1 punto\n- Rigore parato: +3 punti\n- Porta inviolata: +0,5 punti\n- Autogoal: -2 punti\n- Rigore sbagliato: -2 punti\n- Ammonizione: -0,5 punti\n- Espulsione: -1 punto\nA partire da 66 punti complessivi, verrà assegnato 1 goal per ogni 3 punti."
+  },
+  {
+    "rule_number": 7,
+    "content": "Capitano e Vice-Capitano:\nAl termine dell'asta, ogni partecipante dovrà nominare un capitano e un vice-capitano che rimarranno tali per l'intera stagione. Il capitano riceverà un bonus di +1 punto in caso di voto superiore a 7 e un malus di -1 punto in caso di voto inferiore a 5. Il vice-capitano assumerà il ruolo di capitano solo in caso di assenza o mancato voto del capitano. Il capitano potrà essere scambiato nel corso della stagione, o venduto durante i mercati di riparazione; nel caso in cui venisse scambiato/venduto il vice/capitano, il partecipante ha l'obbligo di sostituirlo entro l'inizio della giornata successiva. Il valore massimo per l'acquisto del capitano è di 15 fantamilioni."
+  },
+  {
+    "rule_number": 8,
+    "content": "Mancato Inserimento della Formazione:\nIn caso di mancato inserimento della formazione entro i termini stabiliti, verrà applicata una penalizzazione di 1 punto per ciascun mancato inserimento. A partire dal secondo mancato inserimento, il partecipante dovrà versare 5 euro per ogni ulteriore dimenticanza. Se l'omissione avviene nelle ultime 5 giornate di campionato, la sanzione sarà di 10 euro per ogni mancato inserimento. In coppa, sarà applicata una penalizzazione di 3 punti al punteggio totale di giornata."
+  },
+  {
+    "rule_number": 9,
+    "content": "Mercato di riparazione: Il mercato di riparazione si svolge una sola volta a stagione, nel mese di gennaio, senza limiti di svincolo. Ciascun partecipante è obbligato a effettuare un'offerta per ricoprire tutti i giocatori (compreso il pacchetto intero in caso di cessione del pacchetto portieri) venduti. Nel caso il partecipante non rispettasse tale regola, verranno invalidate le sue buste e potrà comprare giocatori solamente una volta che tutte le altre rose sono state completate"
+  },
+  {
+    "rule_number": 10,
+    "content": "Scambi Illimitati: Durante l'intero corso del campionato, sarà possibile effettuare scambi tra le squadre, anche con eventuali conguagli in fantamilioni. Tuttavia, al fine di evitare scambi brevi finalizzati a coprire esigenze temporanee, non è possibile ri-scambiare lo stesso giocatore tra i due partecipanti"
+  },
+  {
+    "rule_number": 11,
+    "content": "Valutazione dei Giocatori durante il Mercato di Riparazione: Nel mercato di riparazione, i giocatori potranno essere ceduti al prezzo corrispondente alla quotazione ufficiale del giocatore al momento della vendita, come riportato su fantacalcio.it."
+  },
+  {
+    "rule_number": 12,
+    "content": "Partite rinviate: In caso di rinvio di una partita, se la partita verrà giocata entro l'inizio della successiva giornata, si attenderà il risultato della stessa. Nel caso di più partite rinviate, si segue la seguente logica:\n- <= 2 partite re-inviate dopo la successiva giornata di campionato: assegnazione automatica del 6 politico per i giocatori delle squadre. Il 6 politico viene assegnato a tutti i giocatori in rosa\n- > 2 partite re-inviate dopo la successiva giornata di campionata: si attende che tutte le partite vengano giocate e la giornata viene calcolata regolarmente"
+  },
+  {
+    "rule_number": 13,
+    "content": "Quota di partecipazione: Per partecipare al fantacalcio, ogni giocatore dovrà versare una quota di 50 euro."
+  },
+  {
+    "rule_number": 14,
+    "content": "Montepremi: La distribuzione del montepremi sarà la seguente:\n- Campionato:\n  o 1° classificato: 200 euro\n  o 2° classificato: 100 euro\n  o 3° classificato: 50 euro\n  o Miglior punteggio: 50 euro\n- Coppa:\n  o 1° classificato: 100 euro\nLe somme accumulate per i mancati inserimenti della formazione saranno suddivise equamente tra il vincitore del campionato e il miglior punteggio."
+  },
+  {
+    "rule_number": 15,
+    "content": "Penalità per gli Ultimi Classificati: I partecipanti che alla fine del campionato occuperanno la 9ª e la 10ª posizione in classifica, dovranno versare una somma al fondo cassa da destinare all'acquisto di prodotti alcolici per l'asta successiva. In caso di mancata presentazione con doni alcolici/cibarie all'asta successiva, verranno sottratti 50 milioni dal budget iniziale."
+  },
+  {
+    "rule_number": 16,
+    "content": "Termine Inserimento Formazione: La formazione dovrà essere inserita entro e non oltre 5 minuti prima dell'inizio della prima partita di giornata (tempistica definita da sistema fantacalcio)."
+  },
+  {
+    "rule_number": 17,
+    "content": "Autogol Automatico: In caso una squadra realizzi un punteggio inferiore a 50 punti, verrà automaticamente assegnato un autogol."
+  },
+  {
+    "rule_number": 18,
+    "content": "Modificatore Difesa: Se vengono schierati almeno 4 difensori in campo, e la media voto dei 3 migliori difensori più il portiere rientra nei seguenti scaglioni, si applicheranno i seguenti bonus:\n- Media voto 6<= x < 6,5: +1 punto\n- Media voto 6,5 <= x < 7: +2 punti\n- Media voto > =7: +3 punti"
+  },
+  {
+    "rule_number": 19,
+    "content": "Sostituzioni: Il numero massimo di sostituzioni consentito durante una partita è di 5 giocatori."
+  },
+  {
+    "rule_number": 20,
+    "content": "Decreto Fede: Durante il mercato di riparazione di gennaio, è vietato riacquistare il giocatore appena venduto al primo turno di buste. Sarà possibile fare offerte per lo stesso giocatore solo a partire dal secondo turno."
+  },
+  {
+    "rule_number": 21,
+    "content": "Sospensione del Campionato: La sospensione del campionato sarà possibile solo con il consenso di almeno 8 partecipanti favorevoli."
+  },
+  {
+    "rule_number": 22,
+    "content": "Moduli consentiti: I moduli consentiti per la formazione delle squadre sono:\n- 3-4-3\n- 3-5-2\n- 4-3-3\n- 4-4-2\n- 4-5-1\n- 5-3-2\n- 5-4-1"
+  },
+  {
+    "rule_number": 23,
+    "content": "Criteri di ordinamento della classifica: La classifica sarà determinata secondo i seguenti criteri:\n1. Punti\n2. Somma punti totale\n3. Gol fatti\n4. Punteggio dei panchinari (per le partite di coppa ad eliminazione diretta)"
+  },
+  {
+    "rule_number": 24,
+    "content": "Chiusura lista giocatori: A inizio asta chiudiamo la lista dei giocatori acquistabili. Non sarà possibile acquistare giocatori che verranno inseriti nel listone da fantacalcio.it post avvio dell'asta."
+  },
+  {
+    "rule_number": 25,
+    "content": "Competizione di Coppa: La competizione di Coppa si svolgerà in tre fasi:\n- Una fase a girone unico in modalità Royal Rumble durante il girone di andata, con un turno di Coppa ogni due partite di campionato.\nI primi due classificati accederanno direttamente alla fase finale, mentre le squadre dal terzo al decimo posto parteciperanno ai playoff, suddivise in due gironi da quattro squadre ciascuno.\n- Girone A (chi vince vs 1 fase finale): 3,6,9,10 classificato\n- Girone B (chi vince vs 2): 4,5,7,8\nI gironi si affronteranno in andata e ritorno a partire dalla ventesima giornata di Serie A. I vincitori dei gironi playoff si uniranno alle due squadre già qualificate per le semifinali, che si disputeranno in andata e ritorno, seguite da una finale secca, con la fase finale che inizi"
+  },
+  {
+    "rule_number": 26,
+    "content": "Modifiche al regolamento a campionato in corso:\nIl presente regolamento può essere modificato a campionato in corso se e soltanto se almeno 8 partecipanti approvano favorevolmente la modifica. Ogni eventuale modifica apportata entra in vigore dalla data di approvazione (raggiungimento del quorum) e non ha effetto retroattivo."
+  }
+]

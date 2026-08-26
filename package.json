@@ -13,10 +13,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.45.4",
+    "@netlify/blobs": "^8.1.0",
     "dotenv": "^17.2.1",
-    "pdf-lib": "^1.17.1",
-    "markdown-it": "^14.1.0",
     "openai": "^4.52.0",
     "telegraf": "^4.16.3"
   },
@@ -25,7 +23,6 @@
     "@typescript-eslint/parser": "^8.5.0",
     "eslint": "^9.9.0",
     "tsx": "^4.20.4",
-    "typescript": "^5.6.2",
-    "@types/markdown-it": "^14.1.2"
+    "typescript": "^5.6.2"
   }
 }

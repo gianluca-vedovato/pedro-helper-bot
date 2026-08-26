@@ -30,8 +30,7 @@ server.listen(port, () => {
   console.log(`Local webhook listening on http://localhost:${port}`)
   console.log('Environment variables loaded:', {
     BOT_TOKEN: process.env.BOT_TOKEN ? '✅ Set' : '❌ Missing',
-    OPENAI_API_KEY: process.env.OPENAI_API_KEY ? '✅ Set' : '❌ Missing',
-    SUPABASE_URL: process.env.SUPABASE_URL ? '✅ Set' : '❌ Missing'
+    OPENAI_API_KEY: process.env.OPENAI_API_KEY ? '✅ Set' : '❌ Missing'
   })
 })
 

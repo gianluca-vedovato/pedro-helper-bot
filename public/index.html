@@ -1,0 +1,260 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Regolamento Fantacalcio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper: #f4f5ee;
+    --paper-raised: #fbfbf5;
+    --ink: #1b2420;
+    --ink-soft: #4c564e;
+    --line: #d7dcc9;
+    --pitch: #16342a;
+    --gold: #a9822f;
+    --gold-soft: #efe4c2;
+    --shadow: 0 1px 2px rgba(22, 52, 42, 0.06);
+    --radius: 3px;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper: #101a15;
+      --paper-raised: #16211b;
+      --ink: #e9ede4;
+      --ink-soft: #a7b3a5;
+      --line: #2c3a30;
+      --pitch: #eef1e6;
+      --gold: #d3ad5c;
+      --gold-soft: #2c2413;
+      --shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --paper: #101a15;
+    --paper-raised: #16211b;
+    --ink: #e9ede4;
+    --ink-soft: #a7b3a5;
+    --line: #2c3a30;
+    --pitch: #eef1e6;
+    --gold: #d3ad5c;
+    --gold-soft: #2c2413;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: "IBM Plex Sans", -apple-system, BlinkMacSystemFont, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  .page {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 4.5rem 1.5rem 6rem;
+  }
+
+  header.letterhead {
+    text-align: center;
+    padding-bottom: 2.25rem;
+    border-bottom: 3px double var(--line);
+    margin-bottom: 3rem;
+  }
+
+  .eyebrow {
+    display: block;
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 0.72rem;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--gold);
+    margin-bottom: 1rem;
+  }
+
+  h1 {
+    font-family: "Fraunces", Georgia, serif;
+    font-optical-sizing: auto;
+    font-weight: 600;
+    font-size: clamp(2.1rem, 5vw, 3rem);
+    line-height: 1.08;
+    letter-spacing: -0.01em;
+    margin: 0 0 0.65rem;
+    text-wrap: balance;
+  }
+
+  .tagline {
+    font-size: 0.95rem;
+    color: var(--ink-soft);
+    margin: 0;
+  }
+
+  .tagline strong {
+    color: var(--ink);
+    font-weight: 600;
+  }
+
+  #rules {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .status {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 0.85rem;
+    color: var(--ink-soft);
+    text-align: center;
+    padding: 3rem 0;
+    letter-spacing: 0.02em;
+  }
+
+  .status.error { color: #a4432f; }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) .status.error { color: #e08469; }
+  }
+  :root[data-theme="dark"] .status.error { color: #e08469; }
+
+  article.rule {
+    display: grid;
+    grid-template-columns: 3.75rem 1fr;
+    gap: 0 1.25rem;
+    padding: 1.6rem 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  article.rule:first-child { padding-top: 0; }
+  article.rule:last-child { border-bottom: none; }
+
+  .rule-tag {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-variant-numeric: tabular-nums;
+    font-size: 0.75rem;
+    letter-spacing: 0.05em;
+    color: var(--gold);
+    padding-top: 0.3rem;
+  }
+
+  .rule-tag .n {
+    display: block;
+    font-size: 1.3rem;
+    font-family: "Fraunces", Georgia, serif;
+    font-weight: 500;
+    color: var(--pitch);
+    letter-spacing: 0;
+    line-height: 1;
+    margin-bottom: 0.2rem;
+  }
+
+  .rule-body h2 {
+    font-family: "Fraunces", Georgia, serif;
+    font-weight: 600;
+    font-size: 1.08rem;
+    margin: 0 0 0.4rem;
+    line-height: 1.35;
+    text-wrap: balance;
+  }
+
+  .rule-body p {
+    margin: 0;
+    max-width: 62ch;
+    font-size: 0.98rem;
+    line-height: 1.65;
+    color: var(--ink-soft);
+    white-space: pre-wrap;
+  }
+
+  .rule-body p strong { color: var(--ink); font-weight: 600; }
+
+  footer {
+    margin-top: 3.5rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--line);
+    text-align: center;
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 0.72rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+  }
+
+  @media (max-width: 520px) {
+    article.rule { grid-template-columns: 1fr; gap: 0.35rem 0; }
+    .rule-tag { display: flex; align-items: baseline; gap: 0.5rem; padding-top: 0; }
+    .rule-tag .n { margin-bottom: 0; }
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    article.rule { animation: rise 0.4s ease backwards; }
+  }
+  @keyframes rise {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+</style>
+</head>
+<body>
+  <div class="page">
+    <header class="letterhead">
+      <span class="eyebrow">Lega Fantacalcio · Documento ufficiale</span>
+      <h1>Regolamento Fantacalcio</h1>
+      <p class="tagline">Le regole approvate dalla lega, <strong>articolo per articolo</strong>.</p>
+    </header>
+
+    <div id="rules"><p class="status">Apertura del regolamento…</p></div>
+
+    <footer>Aggiornato in tempo reale dallo store della lega</footer>
+  </div>
+
+  <script>
+    // Molte regole iniziano con "Etichetta: elaborazione" — se il pattern c'è,
+    // l'etichetta diventa il titolo e viene tolta dal corpo per non ripeterla.
+    function splitTitle(text) {
+      var m = text.match(/^([^\n:]{3,60}):\s*/);
+      if (m) return { title: m[1], body: text.slice(m[0].length) };
+      var s = text.match(/^[^.\n]{3,80}[.\n]/);
+      return { title: (s ? s[0] : text.slice(0, 60)).replace(/[.\n]$/, ''), body: text };
+    }
+
+    function escapeHtml(s) {
+      return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    fetch('/.netlify/functions/rules-list')
+      .then(function (res) {
+        if (!res.ok) throw new Error('network');
+        return res.json();
+      })
+      .then(function (rules) {
+        var container = document.getElementById('rules');
+        if (!Array.isArray(rules) || rules.length === 0) {
+          container.innerHTML = '<p class="status">Nessuna regola ancora depositata.</p>';
+          return;
+        }
+        container.innerHTML = rules
+          .map(function (r, i) {
+            var split = splitTitle(String(r.content || ''));
+            var delay = Math.min(i * 0.03, 0.6);
+            return '<article class="rule" style="animation-delay:' + delay + 's">' +
+              '<div class="rule-tag"><span class="n">' + r.rule_number + '</span>Art.</div>' +
+              '<div class="rule-body"><h2>' + escapeHtml(split.title) + '</h2><p>' + escapeHtml(split.body) + '</p></div>' +
+            '</article>';
+          })
+          .join('');
+      })
+      .catch(function (err) {
+        document.getElementById('rules').innerHTML =
+          '<p class="status error">Il regolamento non è raggiungibile in questo momento. Riprova più tardi.</p>';
+        console.error(err);
+      });
+  </script>
+</body>
+</html>

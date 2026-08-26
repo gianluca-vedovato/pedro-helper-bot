@@ -6,8 +6,7 @@ Bot Telegram per Fantacalcio costruito con Node.js e TypeScript, deployato su Ne
 
 - Bot Telegram per gestione regolamento Fantacalcio
 - Integrazione con OpenAI per risposte intelligenti
-- Database Supabase per persistenza dati
-- Sistema di promemoria per i gruppi
+- Sito statico che mostra il regolamento aggiornato
 - Deploy automatico su Netlify
 
 ## 🛠️ Tecnologie
@@ -15,9 +14,9 @@ Bot Telegram per Fantacalcio costruito con Node.js e TypeScript, deployato su Ne
 - **Runtime**: Node.js 18+
 - **Language**: TypeScript
 - **Framework**: Telegraf per Telegram Bot API
-- **Database**: Supabase
+- **Database**: Netlify Blobs (store chiave-valore nativo di Netlify)
 - **AI**: OpenAI API
-- **Deploy**: Netlify Functions
+- **Deploy**: Netlify Functions + sito statico
 
 ## 📁 Struttura Progetto
 
@@ -26,9 +25,14 @@ netlify/
 ├── functions/
 │   ├── telegram-webhook.ts      # Webhook principale per Telegram
 │   ├── telegram-webhook-local.ts # Versione locale per sviluppo
+│   ├── rules-list.ts            # Endpoint JSON con le regole (usato dal sito)
+│   ├── data/
+│   │   └── rules.seed.json      # Dati iniziali usati per popolare lo store al primo avvio
 │   └── services/
-│       ├── ai.ts               # Servizio OpenAI
-│       └── db.ts               # Servizio database Supabase
+│       ├── ai.ts                # Servizio OpenAI
+│       └── rules.ts             # Servizio regole su Netlify Blobs
+public/
+└── index.html                   # Pagina statica che mostra il regolamento
 ```
 
 ## 🚀 Setup Locale
@@ -43,13 +47,18 @@ netlify/
    ```
    TELEGRAM_BOT_TOKEN=your_bot_token
    OPENAI_API_KEY=your_openai_key
-   SUPABASE_URL=your_supabase_url
-   SUPABASE_ANON_KEY=your_supabase_anon_key
    ```
 
 3. **Avvia in locale**:
    ```bash
    npm start
+   ```
+   Questo avvia solo il webhook del bot in un server HTTP locale. Netlify Blobs risolve le
+   credenziali automaticamente solo quando la funzione gira su Netlify o sotto `netlify dev`:
+   per testare in locale anche le scritture delle regole (`/crea_regola`, `/aggiorna_regola`,
+   `/cancella_regola`) e la pagina statica, usa invece:
+   ```bash
+   npx netlify dev
    ```
 
 ## 🌐 Deploy su Netlify
@@ -64,13 +73,11 @@ netlify/
 - `/help` - Mostra aiuto
 - `/regolamento [n]` - Visualizza regole (specifica o tutte)
 - `/askpedro [domanda]` - Chiedi al bot
-- `/promemoria <testo>` - Salva un promemoria
-- `/promemoria_lista` - Lista tutti i promemoria
-- `/promemoria_cancella <id>` - Cancella un promemoria
-- `/crea_regola <numero> <contenuto>` - Crea o aggiorna una regola (solo admin)
+- `/crea_regola <tema>` - Crea una nuova regola con l'AI (solo admin)
+- `/aggiorna_regola <numero> <tema>` - Aggiorna una regola con l'AI (solo admin)
 - `/cancella_regola <numero>` - Cancella una regola (solo admin)
 
-> **Nota**: I comandi `/crea_regola` e `/cancella_regola` sono disponibili solo per gli amministratori del gruppo.
+> **Nota**: I comandi `/crea_regola`, `/aggiorna_regola` e `/cancella_regola` sono disponibili solo per gli amministratori del gruppo.
 
 ## 📝 Script Disponibili
 
@@ -85,10 +92,11 @@ Il progetto usa:
 - **ESLint** per linting del codice
 - **TypeScript** per type checking
 - **Netlify Functions** per il deploy serverless
+- **Netlify Blobs** per la persistenza delle regole
 - **esbuild** per la compilazione automatica
 
 ## 📚 Documentazione
 
 - [Netlify Functions](https://docs.netlify.com/functions/overview/)
+- [Netlify Blobs](https://docs.netlify.com/blobs/overview/)
 - [Telegraf](https://telegraf.js.org/)
-- [Supabase](https://supabase.com/docs) 

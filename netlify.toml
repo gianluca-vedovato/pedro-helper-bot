@@ -5,28 +5,20 @@
 
 [build]
   # Nessun build custom necessario per le Functions; esbuild gestisce TS automaticamente
-  publish = "."
+  publish = "public"
 
 [functions."telegram-webhook"]
   node_bundler = "esbuild"
-  external_node_modules = ["@supabase/supabase-js"]
 
 [functions."telegram-webhook-local"]
   node_bundler = "esbuild"
 
-[functions."rules-pdf"]
+[functions."rules-list"]
   node_bundler = "esbuild"
-  external_node_modules = ["@supabase/supabase-js"]
-
-[functions."keep-alive"]
-  node_bundler = "esbuild"
-  external_node_modules = ["@supabase/supabase-js"]
-  schedule = "@daily"
-
 
 [[redirects]]
-  from = "/regolamento.pdf"
-  to = "/.netlify/functions/rules-pdf"
+  from = "/regole"
+  to = "/.netlify/functions/rules-list"
   status = 200
 
 

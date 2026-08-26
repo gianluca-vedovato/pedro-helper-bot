@@ -1,15 +1,13 @@
 import { Telegraf } from "telegraf";
-// PDF non più generato qui; gestito dall'endpoint dedicato rules-pdf
 import type { Context } from "telegraf";
+import { connectLambda } from "@netlify/blobs";
 import { askAboutRules, generateRuleContent } from "./services/ai";
-import { rebuildAndUploadRulesPdf } from "./services/pdf";
 import {
-  getSupabase,
   rulesGetAll,
   rulesUpsert,
   rulesDelete,
   rulesNextNumber,
-} from "./services/db";
+} from "./services/rules";
 
 const BOT_TOKEN = process.env.BOT_TOKEN;
 const ASKPEDRO_PROMPT_PREFIX =
@@ -31,14 +29,14 @@ function ensureBot() {
     bot.start(async (ctx) => {
       console.log("🚀 Comando /start ricevuto");
       await ctx.reply(
-        "Ciao! Sono Pedro (Node). Comandi:\n/regolamento [n]\n/askpedro → poi rispondi con la domanda\n/promemoria, /promemoria_lista, /promemoria_cancella\n/crea_regola [tema], /aggiorna_regola [numero] [tema], /cancella_regola"
+        "Ciao! Sono Pedro (Node). Comandi:\n/regolamento [n]\n/askpedro → poi rispondi con la domanda\n/crea_regola [tema], /aggiorna_regola [numero] [tema], /cancella_regola"
       );
     });
 
     bot.help(async (ctx) => {
       console.log("❓ Comando /help ricevuto");
       await ctx.reply(
-        "Comandi:\n/start\n/help\n/regolamento [numero]\n/askpedro → invia il comando e RISPOSTI con la domanda\n/promemoria <testo>\n/promemoria_lista\n/promemoria_cancella <id>\n/crea_regola <tema>\n/aggiorna_regola <numero> <tema>\n/cancella_regola <numero>"
+        "Comandi:\n/start\n/help\n/regolamento [numero]\n/askpedro → invia il comando e RISPOSTI con la domanda\n/crea_regola <tema>\n/aggiorna_regola <numero> <tema>\n/cancella_regola <numero>"
       );
     });
 
@@ -62,24 +60,13 @@ function ensureBot() {
         });
       }
 
-      // Invia direttamente il link al PDF servito via Function HTTP
-      const baseUrl = process.env.SITE_URL || process.env.URL || "";
-      const supaUrl = process.env.SUPABASE_URL || "";
-      const bucket = process.env.SUPABASE_BUCKET || "assets";
-      const pdfPath = process.env.SUPABASE_RULES_PDF_PATH || "regolamento.pdf";
-      const publicPdf = supaUrl
-        ? `${supaUrl.replace(
-            /\/$/,
-            ""
-          )}/storage/v1/object/public/${bucket}/${pdfPath}`
-        : "";
-      const bust = Date.now();
-      const link =
-        (publicPdf ||
-          (baseUrl
-            ? `${baseUrl.replace(/\/$/, "")}/regolamento.pdf`
-            : "/regolamento.pdf")) + `?t=${bust}`;
-      await ctx.reply(`📄 Scarica il PDF del regolamento: ${link}`);
+      const rulesText = (rules as any[])
+        .map((r) => `📋 Regola ${r.rule_number}:\n${formatRule(r.content)}`)
+        .join("\n\n");
+      for (let i = 0; i < rulesText.length; i += 4096)
+        await ctx.reply(rulesText.slice(i, i + 4096), {
+          parse_mode: "Markdown",
+        });
     });
 
     bot.command("askpedro", async (ctx) => {
@@ -98,69 +85,6 @@ function ensureBot() {
         .join("\n\n");
       const answer = await askAboutRules(q, rulesText);
       await ctx.reply(answer, { parse_mode: "Markdown" });
-    });
-
-    bot.command("promemoria", async (ctx) => {
-      console.log("📝 Comando /promemoria ricevuto");
-      const text = (ctx.message?.text || "")
-        .split(" ")
-        .slice(1)
-        .join(" ")
-        .trim();
-      if (!text) return ctx.reply("Uso: /promemoria <testo>");
-      const chat_id = ctx.chat?.id;
-      const user = ctx.from || ({} as any);
-      const user_name =
-        user.username ||
-        `${user.first_name || ""} ${user.last_name || ""}`.trim() ||
-        "Utente";
-      const supabase = getSupabase();
-      if (!supabase) return ctx.reply("DB non configurato.");
-      const { data, error } = await supabase
-        .from("reminders")
-        .insert({ chat_id, user_id: user.id, user_name, text })
-        .select("id")
-        .single();
-      if (error) return ctx.reply("❌ Errore nel salvataggio del promemoria.");
-      return ctx.reply(`✅ Promemoria salvato (#${(data as any).id})\n${text}`);
-    });
-
-    bot.command("promemoria_lista", async (ctx) => {
-      console.log("📋 Comando /promemoria_lista ricevuto");
-      const chat_id = ctx.chat?.id;
-      const supabase = getSupabase();
-      if (!supabase) return ctx.reply("DB non configurato.");
-      const { data, error } = await supabase
-        .from("reminders")
-        .select("id,user_name,text,created_at")
-        .eq("chat_id", chat_id)
-        .order("id", { ascending: false });
-      if (error) return ctx.reply("Errore nel recupero promemoria.");
-      if (!data?.length)
-        return ctx.reply("Nessun promemoria salvato per questo gruppo.");
-      const lines = (data as any[]).map(
-        (r) => `${r.id}. ${r.text}\n   — ${r.user_name} • ${r.created_at}`
-      );
-      const response = `📝 Promemoria salvati:\n\n${lines.join("\n")}`;
-      for (let i = 0; i < response.length; i += 4096)
-        await ctx.reply(response.slice(i, i + 4096));
-    });
-
-    bot.command("promemoria_cancella", async (ctx) => {
-      console.log("🗑️ Comando /promemoria_cancella ricevuto");
-      const arg = (ctx.message?.text || "").split(" ").slice(1)[0];
-      const chat_id = ctx.chat?.id;
-      if (!arg) return ctx.reply("Uso: /promemoria_cancella <id>");
-      const supabase = getSupabase();
-      if (!supabase) return ctx.reply("DB non configurato.");
-      const { error } = await supabase
-        .from("reminders")
-        .delete()
-        .eq("id", arg)
-        .eq("chat_id", chat_id);
-      if (error)
-        return ctx.reply("❌ Errore nella cancellazione del promemoria.");
-      return ctx.reply("✅ Promemoria cancellato.");
     });
 
     bot.command("crea_regola", async (ctx) => {
@@ -217,8 +141,6 @@ function ensureBot() {
         const success = await rulesUpsert(ruleNumber, generatedContent);
 
         if (success) {
-          // Rigenera PDF
-          await rebuildAndUploadRulesPdf().catch(() => {});
           // Elimina il messaggio di "generazione in corso"
           await ctx.telegram.deleteMessage(chatId, processingMsg.message_id);
 
@@ -272,7 +194,6 @@ function ensureBot() {
       try {
         const success = await rulesDelete(ruleNumber);
         if (success) {
-          await rebuildAndUploadRulesPdf().catch(() => {});
           return ctx.reply(`✅ Regola ${ruleNumber} cancellata con successo!`);
         } else {
           return ctx.reply("❌ Errore durante la cancellazione della regola.");
@@ -341,7 +262,6 @@ function ensureBot() {
         const success = await rulesUpsert(ruleNumber, updatedContent);
 
         if (success) {
-          await rebuildAndUploadRulesPdf().catch(() => {});
           await ctx.telegram.deleteMessage(chatId, processingMsg.message_id);
           return ctx.reply(
             `✅ Regola ${ruleNumber} aggiornata con successo!\n\n📋 Nuovo contenuto:\n"${updatedContent}"`
@@ -432,38 +352,6 @@ function ensureBot() {
       }
     });
 
-    bot.command("rigenera_regolamento", async (ctx) => {
-      try {
-        const chatId = ctx.chat?.id as number;
-        const userId = ctx.from?.id as number;
-        const isAdmin = await userIsAdmin(ctx, chatId, userId);
-        if (!isAdmin)
-          return ctx.reply(
-            "❌ Solo gli amministratori possono rigenerare il PDF."
-          );
-        const processing = await ctx.reply(
-          "🔄 Rigenero il PDF del regolamento..."
-        );
-        const res = await rebuildAndUploadRulesPdf({ force: "html" });
-        await ctx.telegram.deleteMessage(
-          chatId,
-          (processing as any).message_id
-        );
-        if (!res.ok)
-          return ctx.reply(
-            `❌ Errore rigenerazione PDF: ${res.error || "sconosciuto"}`
-          );
-        return ctx.reply(
-          `✅ PDF rigenerato (${res.renderer}). Link: ${
-            res.url
-          }?t=${Date.now()}`
-        );
-      } catch (e) {
-        console.error("Errore rigenera_regolamento:", e);
-        return ctx.reply("❌ Errore durante la rigenerazione del PDF.");
-      }
-    });
-
     // ======== RISPOSTA ALLA PROMPT /ASKPEDRO ========
     bot.on("text", async (ctx) => {
       try {
@@ -517,6 +405,7 @@ async function userIsAdmin(
 
 export async function handler(event: any) {
   try {
+    if (event?.blobs) connectLambda(event);
     const method =
       event?.httpMethod || event?.method || (event?.body ? "POST" : "GET");
     const url = event?.rawUrl || event?.path || "";
@@ -562,9 +451,6 @@ export async function handler(event: any) {
             "/help",
             "/regolamento",
             "/askpedro",
-            "/promemoria",
-            "/promemoria_lista",
-            "/promemoria_cancella",
             "/crea_regola",
             "/aggiorna_regola",
             "/cancella_regola",
