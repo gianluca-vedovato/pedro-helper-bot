@@ -18,6 +18,11 @@
   node_bundler = "esbuild"
   external_node_modules = ["@supabase/supabase-js"]
 
+[functions."keep-alive"]
+  node_bundler = "esbuild"
+  external_node_modules = ["@supabase/supabase-js"]
+  schedule = "@daily"
+
 
 [[redirects]]
   from = "/regolamento.pdf"

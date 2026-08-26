@@ -1,11 +1,7 @@
 import { Telegraf } from "telegraf";
 // PDF non più generato qui; gestito dall'endpoint dedicato rules-pdf
 import type { Context } from "telegraf";
-import {
-  askAboutRules,
-  applyPollToRules,
-  generateRuleContent,
-} from "./services/ai";
+import { askAboutRules, generateRuleContent } from "./services/ai";
 import { rebuildAndUploadRulesPdf } from "./services/pdf";
 import {
   getSupabase,
@@ -14,7 +10,6 @@ import {
   rulesDelete,
   rulesNextNumber,
 } from "./services/db";
-import { pollsUpsert, pollGetById } from "./services/db";
 
 const BOT_TOKEN = process.env.BOT_TOKEN;
 const ASKPEDRO_PROMPT_PREFIX =
@@ -392,37 +387,6 @@ function ensureBot() {
       }
     });
 
-    // ======== SONDAGGI ========
-    bot.on("message", async (ctx, next) => {
-      const msg: any = ctx.message;
-      if (!msg || !msg.poll) return next();
-      try {
-        const poll = msg.poll;
-        const chatId = ctx.chat?.id as number;
-        const messageId = msg.message_id as number;
-        const snapshot = {
-          poll_id: poll.id as string,
-          chat_id: chatId,
-          message_id: messageId,
-          question: String(poll.question || ""),
-          options: (poll.options || []).map((o: any) => ({
-            text: o.text,
-            voter_count: o.voter_count || 0,
-          })),
-          is_closed: Boolean(poll.is_closed),
-        };
-        await pollsUpsert(snapshot);
-        const text = buildPollRegisteredText(
-          snapshot.poll_id,
-          snapshot.question,
-          snapshot.options
-        );
-        await ctx.reply(text);
-      } catch (e) {
-        console.error("Errore gestione messaggio sondaggio:", e);
-      }
-    });
-
     // ======== RISPOSTA ALLA PROMPT /ASKPEDRO ========
     bot.on("text", async (ctx) => {
       try {
@@ -448,148 +412,6 @@ function ensureBot() {
       }
     });
 
-    bot.on("poll", async (ctx) => {
-      try {
-        const update: any = (ctx as any).update;
-        const poll = update?.poll;
-        if (!poll) return;
-        const snapshot = {
-          poll_id: poll.id as string,
-          chat_id: 0, // sconosciuto in questo update; lo recuperiamo dal DB
-          message_id: 0,
-          question: String(poll.question || ""),
-          options: (poll.options || []).map((o: any) => ({
-            text: o.text,
-            voter_count: o.voter_count || 0,
-          })),
-          is_closed: Boolean(poll.is_closed),
-        };
-        const existing = await pollGetById(snapshot.poll_id);
-        if (existing) {
-          await pollsUpsert({
-            ...snapshot,
-            chat_id: existing.chat_id,
-            message_id: existing.message_id,
-          });
-          if (snapshot.is_closed) {
-            const text = buildPollClosedText(
-              snapshot.poll_id,
-              snapshot.question,
-              snapshot.options
-            );
-            await ctx.telegram.sendMessage(existing.chat_id, text, {
-              reply_markup: {
-                inline_keyboard: [
-                  [
-                    {
-                      text: "Applica",
-                      callback_data: `applica_poll:${snapshot.poll_id}`,
-                    },
-                  ],
-                ],
-              },
-            });
-          }
-        }
-      } catch (e) {
-        console.error("Errore update poll:", e);
-      }
-    });
-
-    bot.command("applica_sondaggio", async (ctx) => {
-      try {
-        const chatId = ctx.chat?.id as number;
-        const userId = ctx.from?.id as number;
-        const arg = (ctx.message?.text || "").split(" ").slice(1)[0];
-        let pollId = arg;
-        if (!pollId) {
-          const replied: any = (ctx.message as any)?.reply_to_message;
-          if (replied && replied.text)
-            pollId = extractPollIdFromText(replied.text);
-        }
-        if (!pollId)
-          return ctx.reply(
-            "Uso: /applica_sondaggio <poll_id> (oppure rispondi al messaggio di registrazione)"
-          );
-        const isAdmin = await userIsAdmin(ctx, chatId, userId);
-        if (!isAdmin)
-          return ctx.reply(
-            "❌ Solo gli amministratori possono applicare i risultati."
-          );
-        const snapshot = await pollGetById(pollId);
-        if (!snapshot)
-          return ctx.reply("❌ Sondaggio non trovato nei registri.");
-        const rules = await rulesGetAll();
-        const rulesText = (rules as any[])
-          .map((r) => `${r.rule_number}. ${r.content}`)
-          .join("\n\n");
-        const result = await applyPollToRules({
-          pollId: snapshot.poll_id,
-          question: snapshot.question,
-          options: snapshot.options,
-          rulesText,
-        });
-        await ctx.reply(result.summary);
-      } catch (e) {
-        console.error("Errore applica_sondaggio:", e);
-        await ctx.reply("❌ Errore durante l'applicazione del sondaggio.");
-      }
-    });
-
-    bot.on("callback_query", async (ctx) => {
-      try {
-        const data = String((ctx.callbackQuery as any)?.data || "");
-        if (!data.startsWith("applica_poll:")) {
-          try {
-            await ctx.answerCbQuery();
-          } catch {}
-          return;
-        }
-
-        // Rispondi SUBITO per evitare timeout del callback_query
-        try {
-          await ctx.answerCbQuery("⏳ Elaboro...");
-        } catch (ackErr) {
-          console.warn("answerCbQuery fallita (ignoro):", ackErr);
-        }
-
-        const pollId = data.split(":")[1];
-        const chatId = ctx.chat?.id as number;
-        const userId = ctx.from?.id as number;
-        const isAdmin = await userIsAdmin(ctx, chatId, userId);
-        if (!isAdmin) {
-          await ctx.reply(
-            "❌ Solo gli amministratori possono applicare i risultati."
-          );
-          return;
-        }
-
-        const snapshot = await pollGetById(pollId);
-        if (!snapshot) {
-          await ctx.reply("❌ Sondaggio non trovato nei registri.");
-          return;
-        }
-        const rules = await rulesGetAll();
-        const rulesText = (rules as any[])
-          .map((r) => `${r.rule_number}. ${r.content}`)
-          .join("\n\n");
-        const result = await applyPollToRules({
-          pollId,
-          question: snapshot.question,
-          options: snapshot.options,
-          rulesText,
-        });
-        await ctx.reply(result.summary);
-      } catch (e) {
-        console.error("Errore callback applica_poll:", e);
-        try {
-          await ctx.answerCbQuery("Errore durante l'applicazione.", {
-            show_alert: true,
-          });
-        } catch {}
-      }
-    });
-
     console.log("✅ Tutti i comandi configurati");
   } else {
     console.log("🤖 Bot già inizializzato");
@@ -599,46 +421,6 @@ function ensureBot() {
 
 function formatRule(content: string): string {
   return content.replace(/\*\*/g, "**").replace(/\n/g, "\n");
-}
-
-function buildPollRegisteredText(
-  pollId: string,
-  question: string,
-  options: { text: string; voter_count: number }[]
-): string {
-  const optionsText = options.map((o) => o.text).join(", ");
-  return [
-    "🗳️ Sondaggio registrato!\n",
-    `📝 Domanda: ${question}`,
-    `🔢 Opzioni: ${optionsText}`,
-    `🆔 ID: ${pollId}`,
-  ].join("\n");
-}
-
-function buildPollClosedText(
-  pollId: string,
-  question: string,
-  options: { text: string; voter_count: number }[]
-): string {
-  const optionsText = options
-    .map((o) => `${o.text} → ${o.voter_count} voti`)
-    .join("\n");
-  const totalVotes = options.reduce((sum, o) => sum + o.voter_count, 0);
-  const winningOptions = options.filter(
-    (o) => o.voter_count === Math.max(...options.map((opt) => opt.voter_count))
-  );
-
-  return [
-    "🔒 Sondaggio chiuso!\n",
-    `📝 Domanda: ${question}`,
-    `🔢 Risultati (${totalVotes} voti totali):`,
-    optionsText,
-    `\n🏆 Opzione/i vincente/i:`,
-    ...winningOptions.map((o) => `• ${o.text} (${o.voter_count} voti)`),
-    `\n🆔 ID: ${pollId}`,
-    '\n💡 Per applicare i risultati, premi il pulsante "Applica" qui sotto.',
-    "\n⚠️ Solo gli amministratori possono applicare i risultati.",
-  ].join("\n");
 }
 
 async function userIsAdmin(
@@ -654,11 +436,6 @@ async function userIsAdmin(
     console.error("Errore verifica admin:", e);
     return false;
   }
-}
-
-function extractPollIdFromText(text: string): string | "" {
-  const m = text.match(/ID:\s*(\w+)/);
-  return (m && m[1]) || "";
 }
 
 export async function handler(event: any) {
@@ -713,7 +490,6 @@ export async function handler(event: any) {
             "/promemoria_cancella",
             "/crea_regola",
             "/cancella_regola",
-            "/applica_sondaggio",
           ],
         }),
       };

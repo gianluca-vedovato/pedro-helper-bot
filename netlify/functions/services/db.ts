@@ -49,6 +49,7 @@ export async function rulesUpsert(rule_number: number, content: string): Promise
   const { error } = await client
     .from('rules')
     .upsert({ rule_number, content, updated_at: now }, { onConflict: 'rule_number' })
+  if (error) console.error('❌ rulesUpsert: errore Supabase:', error)
   return !error
 }
 
@@ -56,46 +57,9 @@ export async function rulesDelete(rule_number: number): Promise<boolean> {
   const client = getSupabase()
   if (!client) return false
   const { error } = await client.from('rules').delete().eq('rule_number', rule_number)
+  if (error) console.error('❌ rulesDelete: errore Supabase:', error)
   return !error
 }
-
-
-// Polls storage (snapshot)
-export type StoredPoll = {
-  poll_id: string
-  chat_id: number
-  message_id: number
-  question: string
-  options: { text: string; voter_count: number }[]
-  is_closed: boolean
-}
-
-export async function pollsUpsert(poll: StoredPoll): Promise<boolean> {
-  const client = getSupabase()
-  if (!client) return false
-  const { error } = await client
-    .from('polls')
-    .upsert(
-      {
-        poll_id: poll.poll_id,
-        chat_id: poll.chat_id,
-        message_id: poll.message_id,
-        question: poll.question,
-        options: poll.options,
-        is_closed: poll.is_closed
-      },
-      { onConflict: 'poll_id' }
-    )
-  return !error
-}
-
-export async function pollGetById(poll_id: string): Promise<StoredPoll | null> {
-  const client = getSupabase()
-  if (!client) return null
-  const { data } = await client.from('polls').select('*').eq('poll_id', poll_id).limit(1)
-  return (data && (data[0] as any)) || null
-}
-
 
 
 
