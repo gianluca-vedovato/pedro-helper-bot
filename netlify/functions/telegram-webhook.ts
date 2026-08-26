@@ -31,14 +31,14 @@ function ensureBot() {
     bot.start(async (ctx) => {
       console.log("🚀 Comando /start ricevuto");
       await ctx.reply(
-        "Ciao! Sono Pedro (Node). Comandi:\n/regolamento [n]\n/askpedro → poi rispondi con la domanda\n/promemoria, /promemoria_lista, /promemoria_cancella\n/crea_regola [tema], /cancella_regola"
+        "Ciao! Sono Pedro (Node). Comandi:\n/regolamento [n]\n/askpedro → poi rispondi con la domanda\n/promemoria, /promemoria_lista, /promemoria_cancella\n/crea_regola [tema], /aggiorna_regola [numero] [tema], /cancella_regola"
       );
     });
 
     bot.help(async (ctx) => {
       console.log("❓ Comando /help ricevuto");
       await ctx.reply(
-        "Comandi:\n/start\n/help\n/regolamento [numero]\n/askpedro → invia il comando e RISPOSTI con la domanda\n/promemoria <testo>\n/promemoria_lista\n/promemoria_cancella <id>\n/crea_regola <tema>\n/cancella_regola <numero>"
+        "Comandi:\n/start\n/help\n/regolamento [numero]\n/askpedro → invia il comando e RISPOSTI con la domanda\n/promemoria <testo>\n/promemoria_lista\n/promemoria_cancella <id>\n/crea_regola <tema>\n/aggiorna_regola <numero> <tema>\n/cancella_regola <numero>"
       );
     });
 
@@ -285,6 +285,83 @@ function ensureBot() {
       }
     });
 
+    bot.command("aggiorna_regola", async (ctx) => {
+      console.log("✏️ Comando /aggiorna_regola ricevuto");
+      const args = (ctx.message?.text || "").split(" ").slice(1);
+      const ruleNumber = Number(args[0]);
+
+      if (!args[0] || !Number.isInteger(ruleNumber) || ruleNumber <= 0) {
+        return ctx.reply(
+          '❌ Uso: /aggiorna_regola <numero> <nuovo tema>\n\nEsempio:\n/aggiorna_regola 5 "il budget diventa 600 fantamilioni"'
+        );
+      }
+
+      const topic = args.slice(1).join(" ").trim();
+      if (topic.length < 3) {
+        return ctx.reply(
+          "❌ Il nuovo tema/testo deve essere di almeno 3 caratteri."
+        );
+      }
+
+      const chatId = ctx.chat?.id as number;
+      const userId = ctx.from?.id as number;
+      const isAdmin = await userIsAdmin(ctx, chatId, userId);
+
+      if (!isAdmin) {
+        return ctx.reply(
+          "❌ Solo gli amministratori possono aggiornare regole."
+        );
+      }
+
+      try {
+        const existingRules = await rulesGetAll();
+        const existing = (existingRules as any[]).find(
+          (r) => r.rule_number === ruleNumber
+        );
+        if (!existing) {
+          return ctx.reply(
+            `❌ Regola ${ruleNumber} non trovata. Usa /crea_regola per crearne una nuova.`
+          );
+        }
+
+        const processingMsg = await ctx.reply(
+          "🤖 Sto aggiornando la regola con l'AI..."
+        );
+
+        const existingRulesText = (existingRules as any[])
+          .map((r) => `${r.rule_number}. ${r.content}`)
+          .join("\n");
+
+        const updatedContent = await generateRuleContent(
+          ruleNumber,
+          `Aggiorna la regola ${ruleNumber} (testo attuale: "${existing.content}") in base a questa richiesta: ${topic}`,
+          existingRulesText
+        );
+
+        const success = await rulesUpsert(ruleNumber, updatedContent);
+
+        if (success) {
+          await rebuildAndUploadRulesPdf().catch(() => {});
+          await ctx.telegram.deleteMessage(chatId, processingMsg.message_id);
+          return ctx.reply(
+            `✅ Regola ${ruleNumber} aggiornata con successo!\n\n📋 Nuovo contenuto:\n"${updatedContent}"`
+          );
+        } else {
+          await ctx.telegram.deleteMessage(chatId, processingMsg.message_id);
+          return ctx.reply(
+            "❌ Errore durante il salvataggio della regola aggiornata."
+          );
+        }
+      } catch (error) {
+        console.error("Errore aggiornamento regola con AI:", error);
+        return ctx.reply(
+          `❌ Errore durante l'aggiornamento della regola: ${
+            error instanceof Error ? error.message : "Errore sconosciuto"
+          }`
+        );
+      }
+    });
+
     // ======== MODALITÀ INLINE (@bot askpedro) ========
     bot.on("inline_query", async (ctx) => {
       const query = (ctx.inlineQuery?.query || "").trim();
@@ -489,6 +566,7 @@ export async function handler(event: any) {
             "/promemoria_lista",
             "/promemoria_cancella",
             "/crea_regola",
+            "/aggiorna_regola",
             "/cancella_regola",
           ],
         }),
