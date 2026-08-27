@@ -5,11 +5,11 @@
   },
   {
     "rule_number": 2,
-    "content": "Modalità dell'Asta: Il mercato iniziale si svolgerà a buste, anziché con asta a chiamata.\nIl calciomercato chiude martedì 1 settembre alle 20:00 e venerdì 4 settembre c'è la terza giornata di Serie A.\nLe buste si potranno fare da venerdì 28 agosto, con apertura martedì 1 settembre alle 23:00. Da lì i giri successivi si susseguono ogni 10 ore, per farne il più possibile prima della giornata.\nIl calendario delle buste sarà quindi:\n- 1° giro: 1 settembre ore 23:00\n- 2° giro: 2 settembre ore 9:00\n- 3° giro: 2 settembre ore 19:00\n- 4° giro: 3 settembre ore 5:00\n- 5° giro: 3 settembre ore 15:00\n- 6° giro: 4 settembre ore 1:00\n- 7° giro: 4 settembre ore 11:00\n- 8° e ultimo giro: 4 settembre ore 17:00\nLa rosa di ogni squadra dovrà essere composta da:\nUn pacchetto di portieri\n- 8 difensori\n- 8 centrocampisti\n- 6 attaccanti"
+    "content": "Modalità dell'Asta: Il mercato iniziale si svolgerà a buste, anziché con asta a chiamata.\nIl calciomercato chiude martedì 1 settembre alle 20:00 e venerdì 4 settembre c'è la terza giornata di Serie A.\nLe buste si potranno fare da venerdì 28 agosto, con apertura martedì 1 settembre alle 23:00. Da lì i giri successivi si susseguono ogni 10 ore, per farne il più possibile prima della giornata.\nIl calendario delle buste sarà quindi:\n- 1° giro: 1 settembre ore 23:00\n- 2° giro: 2 settembre ore 9:00\n- 3° giro: 2 settembre ore 19:00\n- 4° giro: 3 settembre ore 5:00\n- 5° giro: 3 settembre ore 15:00\n- 6° giro: 4 settembre ore 1:00\n- 7° giro: 4 settembre ore 11:00\n- 8° e ultimo giro: 4 settembre ore 17:00\nLa rosa di ogni squadra dovrà essere composta da:\nPortieri\n- 8 difensori\n- 8 centrocampisti\n- 6 attaccanti"
   },
   {
     "rule_number": 3,
-    "content": "Acquisto dei Portieri: L'acquisto dei portieri avverrà per pacchetto, ovvero sarà possibile acquistare l'intero pacchetto dei portieri di una squadra. In caso di trasferimento di un portiere a un'altra squadra, il pacchetto resterà invariato senza possibilità di conguaglio economico."
+    "content": "Acquisto dei Portieri: L'acquisto dei portieri avverrà per portiere singolo, non più per pacchetto/blocco squadra."
   },
   {
     "rule_number": 4,
@@ -25,7 +25,7 @@
   },
   {
     "rule_number": 7,
-    "content": "Mercato di riparazione: Il mercato di riparazione si svolge una sola volta a stagione, nel mese di gennaio, senza limiti di svincolo. Ciascun partecipante è obbligato a effettuare un'offerta per ricoprire tutti i giocatori (compreso il pacchetto intero in caso di cessione del pacchetto portieri) venduti. Nel caso il partecipante non rispettasse tale regola, verranno invalidate le sue buste e potrà comprare giocatori solamente una volta che tutte le altre rose sono state completate"
+    "content": "Mercato di riparazione: Il mercato di riparazione si svolge una sola volta a stagione, nel mese di gennaio, senza limiti di svincolo. Ciascun partecipante è obbligato a effettuare un'offerta per ricoprire tutti i giocatori venduti. Nel caso il partecipante non rispettasse tale regola, verranno invalidate le sue buste e potrà comprare giocatori solamente una volta che tutte le altre rose sono state completate"
   },
   {
     "rule_number": 8,
