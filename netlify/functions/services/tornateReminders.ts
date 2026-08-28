@@ -5,7 +5,7 @@ import { announceTornataStart } from "./tornateBuste";
 
 export type Tornata = { id: number; inizio: string; fine: string };
 
-const CHAT_ID = -1002565178851; // TEST: chat di prova, ripristinare -1002779838745 dopo il test
+const CHAT_ID = -1002779838745;
 const SENT_BLOB_KEY = "sent";
 
 const THRESHOLDS = [
