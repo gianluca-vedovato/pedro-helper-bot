@@ -12,7 +12,7 @@ type TornataBusteState = {
   opened: boolean;
 };
 
-const CHAT_ID = -1002779838745;
+const CHAT_ID = -1002565178851; // TEST: chat di prova, ripristinare -1002779838745 dopo il test
 const PARTECIPANTI = partecipantiSeed as Partecipante[];
 const LAST_PINNED_KEY = "last-pinned-message-id";
 
@@ -99,8 +99,12 @@ export async function announceTornataStart(tornata: Tornata): Promise<void> {
     }
   }
 
-  await pinMessage(CHAT_ID, message.message_id);
-  await store().setJSON(LAST_PINNED_KEY, message.message_id);
+  try {
+    await pinMessage(CHAT_ID, message.message_id);
+    await store().setJSON(LAST_PINNED_KEY, message.message_id);
+  } catch (error) {
+    console.error("❌ Errore pin messaggio tornata:", error);
+  }
 }
 
 export async function toggleConfirmation(
