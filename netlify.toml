@@ -16,6 +16,10 @@
 [functions."rules-list"]
   node_bundler = "esbuild"
 
+[functions."tornate-reminder"]
+  node_bundler = "esbuild"
+  schedule = "*/5 * * * *"
+
 [[redirects]]
   from = "/regole"
   to = "/.netlify/functions/rules-list"

@@ -8,6 +8,12 @@ import {
   rulesDelete,
   rulesNextNumber,
 } from "./services/rules";
+import {
+  toggleConfirmation,
+  buildMessageText,
+  buildKeyboard,
+  sendBusteApertePerTornata,
+} from "./services/tornateBuste";
 
 const BOT_TOKEN = process.env.BOT_TOKEN;
 const ASKPEDRO_PROMPT_PREFIX =
@@ -279,6 +285,48 @@ function ensureBot() {
             error instanceof Error ? error.message : "Errore sconosciuto"
           }`
         );
+      }
+    });
+
+    // ======== CONFERMA BUSTE TORNATA ========
+    bot.on("callback_query", async (ctx) => {
+      const data = (ctx.callbackQuery as any)?.data as string | undefined;
+      if (!data || !data.startsWith("busta:")) return;
+
+      const tornataId = Number(data.split(":")[1]);
+      const from = ctx.from;
+      if (!from || !Number.isInteger(tornataId)) {
+        return ctx.answerCbQuery("❌ Errore interno.");
+      }
+
+      const result = await toggleConfirmation(tornataId, {
+        id: from.id,
+        username: from.username,
+      });
+
+      if (!result.ok) {
+        if (result.reason === "not-participant") {
+          return ctx.answerCbQuery("❌ Non sei nell'elenco partecipanti.");
+        }
+        return ctx.answerCbQuery("❌ Tornata non trovata.");
+      }
+
+      try {
+        await ctx.telegram.editMessageText(
+          ctx.chat?.id,
+          result.state.messageId,
+          undefined,
+          buildMessageText(tornataId, result.state.confirmed),
+          { reply_markup: buildKeyboard(tornataId) }
+        );
+      } catch (e) {
+        console.error("Errore aggiornamento messaggio buste:", e);
+      }
+
+      await ctx.answerCbQuery(result.toggledOn ? "✅ Confermato" : "↩️ Annullato");
+
+      if (result.justOpened) {
+        await sendBusteApertePerTornata(tornataId);
       }
     });
 
