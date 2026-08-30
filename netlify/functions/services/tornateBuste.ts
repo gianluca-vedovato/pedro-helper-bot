@@ -10,11 +10,13 @@ type TornataBusteState = {
   messageId: number;
   confirmed: string[];
   opened: boolean;
+  lastSollecitoAt?: number;
 };
 
 const CHAT_ID = -1002779838745;
 const PARTECIPANTI = partecipantiSeed as Partecipante[];
 const LAST_PINNED_KEY = "last-pinned-message-id";
+const SOLLECITO_COOLDOWN_MS = 5 * 60 * 1000;
 
 function store() {
   return getStore("tornate-buste");
@@ -164,7 +166,10 @@ export async function sendBusteApertePerTornata(tornataId: number): Promise<void
 
 export async function sollecitaChiManca(
   tornataId: number
-): Promise<{ ok: false; reason: "no-state" } | { ok: true; nessunoMancante: boolean }> {
+): Promise<
+  | { ok: false; reason: "no-state" }
+  | { ok: true; nessunoMancante: boolean; onCooldown?: boolean; retryAfterSeconds?: number }
+> {
   const state = await getState(tornataId);
   if (!state) return { ok: false, reason: "no-state" };
 
@@ -174,11 +179,23 @@ export async function sollecitaChiManca(
     return { ok: true, nessunoMancante: true };
   }
 
+  const now = Date.now();
+  const elapsed = state.lastSollecitoAt ? now - state.lastSollecitoAt : Infinity;
+  if (elapsed < SOLLECITO_COOLDOWN_MS) {
+    return {
+      ok: true,
+      nessunoMancante: false,
+      onCooldown: true,
+      retryAfterSeconds: Math.ceil((SOLLECITO_COOLDOWN_MS - elapsed) / 1000),
+    };
+  }
+
   const testo = [
     `dai dio can muovetevi!`,
     mancanti.map((p) => mention(p)).join(" "),
   ].join("\n");
 
   await sendMessage(CHAT_ID, testo, { parse_mode: "HTML" });
+  await setState(tornataId, { ...state, lastSollecitoAt: now });
   return { ok: true, nessunoMancante: false };
 }

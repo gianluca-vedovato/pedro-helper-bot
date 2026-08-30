@@ -304,6 +304,12 @@ function ensureBot() {
         if (!result.ok) {
           return ctx.answerCbQuery("❌ Tornata non trovata.");
         }
+        if (result.onCooldown) {
+          return ctx.answerCbQuery(
+            `⏳ Aspetta ancora ${result.retryAfterSeconds}s prima di sollecitare di nuovo.`,
+            { show_alert: true }
+          );
+        }
         return ctx.answerCbQuery(
           result.nessunoMancante ? "✅ Non manca nessuno!" : "🔔 Sollecito inviato"
         );
