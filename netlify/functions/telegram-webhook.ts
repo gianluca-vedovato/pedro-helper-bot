@@ -13,6 +13,7 @@ import {
   buildMessageText,
   buildKeyboard,
   sendBusteApertePerTornata,
+  sollecitaChiManca,
 } from "./services/tornateBuste";
 
 const BOT_TOKEN = process.env.BOT_TOKEN;
@@ -291,11 +292,25 @@ function ensureBot() {
     // ======== CONFERMA BUSTE TORNATA ========
     bot.on("callback_query", async (ctx) => {
       const data = (ctx.callbackQuery as any)?.data as string | undefined;
-      if (!data || !data.startsWith("busta:")) return;
+      if (!data || (!data.startsWith("busta:") && !data.startsWith("sollecita:"))) return;
 
       const tornataId = Number(data.split(":")[1]);
+      if (!Number.isInteger(tornataId)) {
+        return ctx.answerCbQuery("❌ Errore interno.");
+      }
+
+      if (data.startsWith("sollecita:")) {
+        const result = await sollecitaChiManca(tornataId);
+        if (!result.ok) {
+          return ctx.answerCbQuery("❌ Tornata non trovata.");
+        }
+        return ctx.answerCbQuery(
+          result.nessunoMancante ? "✅ Non manca nessuno!" : "🔔 Sollecito inviato"
+        );
+      }
+
       const from = ctx.from;
-      if (!from || !Number.isInteger(tornataId)) {
+      if (!from) {
         return ctx.answerCbQuery("❌ Errore interno.");
       }
 

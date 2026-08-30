@@ -75,8 +75,20 @@ export function buildKeyboard(tornataId: number): InlineKeyboardMarkup {
           callback_data: `busta:${tornataId}`,
         },
       ],
+      [
+        {
+          text: "🔔 Sollecita chi manca",
+          callback_data: `sollecita:${tornataId}`,
+        },
+      ],
     ],
   };
+}
+
+function mention(p: Partecipante): string {
+  if (p.username) return `@${p.username}`;
+  if (p.id) return `<a href="tg://user?id=${p.id}">${p.name}</a>`;
+  return p.name;
 }
 
 export async function announceTornataStart(tornata: Tornata): Promise<void> {
@@ -141,5 +153,32 @@ export async function toggleConfirmation(
 }
 
 export async function sendBusteApertePerTornata(tornataId: number): Promise<void> {
-  await sendMessage(CHAT_ID, `🔓 Tutti hanno confermato per la tornata ${tornataId}: si aprono le buste!`);
+  const admin = PARTECIPANTI.find((p) => p.username === "gianni_cash");
+  const adminMention = admin ? mention(admin) : "@gianni_cash";
+  await sendMessage(
+    CHAT_ID,
+    `🔓 Tutti hanno confermato per la tornata ${tornataId}! ${adminMention} admiiin apri le busteeee`,
+    { parse_mode: "HTML" }
+  );
+}
+
+export async function sollecitaChiManca(
+  tornataId: number
+): Promise<{ ok: false; reason: "no-state" } | { ok: true; nessunoMancante: boolean }> {
+  const state = await getState(tornataId);
+  if (!state) return { ok: false, reason: "no-state" };
+
+  const mancanti = PARTECIPANTI.filter((p) => !state.confirmed.includes(participantKey(p)));
+
+  if (mancanti.length === 0) {
+    return { ok: true, nessunoMancante: true };
+  }
+
+  const testo = [
+    `dai dio can muovetevi!`,
+    mancanti.map((p) => mention(p)).join(" "),
+  ].join("\n");
+
+  await sendMessage(CHAT_ID, testo, { parse_mode: "HTML" });
+  return { ok: true, nessunoMancante: false };
 }

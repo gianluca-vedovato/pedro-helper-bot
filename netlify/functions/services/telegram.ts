@@ -18,7 +18,7 @@ function ensureTelegram() {
 export async function sendMessage(
   chatId: number | string,
   text: string,
-  extra?: { reply_markup?: InlineKeyboardMarkup }
+  extra?: { reply_markup?: InlineKeyboardMarkup; parse_mode?: "HTML" }
 ) {
   await ensureTelegram().sendMessage(chatId, text, extra);
 }
