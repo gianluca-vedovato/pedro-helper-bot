@@ -58,7 +58,7 @@ export function matchParticipant(from: {
 }
 
 async function getState(tornataId: number): Promise<TornataBusteState | null> {
-  const data = await store().get(stateKey(tornataId), { type: "json" });
+  const data = await store().get(stateKey(tornataId), { type: "json", consistency: "strong" });
   return (data as TornataBusteState) || null;
 }
 
