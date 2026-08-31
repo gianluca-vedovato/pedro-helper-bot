@@ -1,7 +1,7 @@
 import { getStore } from "@netlify/blobs";
 import seed from "../data/tornate.seed.json" with { type: "json" };
 import { sendMessage } from "./telegram";
-import { announceTornataStart } from "./tornateBuste";
+import { announceTornataStart, getOverrideInizio } from "./tornateBuste";
 
 export type Tornata = { id: number; inizio: string; fine: string };
 
@@ -35,11 +35,17 @@ export async function checkAndSendTornateReminders(now = new Date()): Promise<vo
   const sent = await getSent();
 
   for (const tornata of tornate) {
-    const inizio = new Date(tornata.inizio);
     const inizioKey = `${tornata.id}-inizio`;
-    if (!sent.includes(inizioKey) && now.getTime() >= inizio.getTime()) {
-      await announceTornataStart(tornata);
-      await markSent(inizioKey);
+    if (!sent.includes(inizioKey)) {
+      const overrideInizioMs = await getOverrideInizio(tornata.id);
+      const inizioMs =
+        overrideInizioMs !== null
+          ? Math.min(overrideInizioMs, new Date(tornata.inizio).getTime())
+          : new Date(tornata.inizio).getTime();
+      if (now.getTime() >= inizioMs) {
+        await announceTornataStart(tornata);
+        await markSent(inizioKey);
+      }
     }
 
     const fine = new Date(tornata.fine);

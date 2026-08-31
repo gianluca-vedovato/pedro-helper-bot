@@ -17,6 +17,7 @@ const CHAT_ID = -1002779838745;
 const PARTECIPANTI = partecipantiSeed as Partecipante[];
 const LAST_PINNED_KEY = "last-pinned-message-id";
 const SOLLECITO_COOLDOWN_MS = 5 * 60 * 1000;
+const NEXT_TORNATA_DELAY_MS = 15 * 60 * 1000;
 
 function store() {
   return getStore("tornate-buste");
@@ -24,6 +25,19 @@ function store() {
 
 function stateKey(tornataId: number) {
   return `tornata-${tornataId}`;
+}
+
+function overrideInizioKey(tornataId: number) {
+  return `override-inizio-${tornataId}`;
+}
+
+export async function getOverrideInizio(tornataId: number): Promise<number | null> {
+  const data = await store().get(overrideInizioKey(tornataId), { type: "json" });
+  return typeof data === "number" ? data : null;
+}
+
+async function setOverrideInizio(tornataId: number, timestampMs: number): Promise<void> {
+  await store().setJSON(overrideInizioKey(tornataId), timestampMs);
 }
 
 function participantKey(p: Partecipante): string {
@@ -162,6 +176,8 @@ export async function sendBusteApertePerTornata(tornataId: number): Promise<void
     `🔓 Tutti hanno confermato per la tornata ${tornataId}! ${adminMention} admiiin apri le busteeee`,
     { parse_mode: "HTML" }
   );
+
+  await setOverrideInizio(tornataId + 1, Date.now() + NEXT_TORNATA_DELAY_MS);
 }
 
 export async function sollecitaChiManca(
