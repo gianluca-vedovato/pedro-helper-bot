@@ -20,7 +20,7 @@ const SOLLECITO_COOLDOWN_MS = 5 * 60 * 1000;
 const NEXT_TORNATA_DELAY_MS = 15 * 60 * 1000;
 
 function store() {
-  return getStore({ name: "tornate-buste", consistency: "strong" });
+  return getStore("tornate-buste");
 }
 
 function stateKey(tornataId: number) {
