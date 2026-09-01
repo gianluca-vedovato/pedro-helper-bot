@@ -300,19 +300,26 @@ function ensureBot() {
       }
 
       if (data.startsWith("sollecita:")) {
-        const result = await sollecitaChiManca(tornataId);
-        if (!result.ok) {
-          return ctx.answerCbQuery("❌ Tornata non trovata.");
-        }
-        if (result.onCooldown) {
+        try {
+          const result = await sollecitaChiManca(tornataId);
+          if (!result.ok) {
+            return ctx.answerCbQuery("❌ Tornata non trovata.");
+          }
+          if (result.onCooldown) {
+            return ctx.answerCbQuery(
+              `⏳ Aspetta ancora ${result.retryAfterSeconds}s prima di sollecitare di nuovo.`,
+              { show_alert: true }
+            );
+          }
           return ctx.answerCbQuery(
-            `⏳ Aspetta ancora ${result.retryAfterSeconds}s prima di sollecitare di nuovo.`,
-            { show_alert: true }
+            result.nessunoMancante ? "✅ Non manca nessuno!" : "🔔 Sollecito inviato"
           );
+        } catch (error) {
+          console.error("Errore durante il sollecito:", error);
+          return ctx.answerCbQuery("❌ Errore durante l'invio del sollecito.", {
+            show_alert: true,
+          });
         }
-        return ctx.answerCbQuery(
-          result.nessunoMancante ? "✅ Non manca nessuno!" : "🔔 Sollecito inviato"
-        );
       }
 
       const from = ctx.from;
