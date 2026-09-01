@@ -211,7 +211,20 @@ export async function sollecitaChiManca(
     mancanti.map((p) => mention(p)).join(" "),
   ].join("\n");
 
-  await sendMessage(CHAT_ID, testo, { parse_mode: "HTML" });
+  try {
+    await sendMessage(CHAT_ID, testo, { parse_mode: "HTML" });
+  } catch (error) {
+    const details =
+      (error as any)?.response?.description ||
+      (error as any)?.message ||
+      String(error);
+    console.error(
+      `❌ Errore invio sollecito (tornata ${tornataId}, chat ${CHAT_ID}, ${mancanti.length} mancanti):`,
+      details
+    );
+    throw error;
+  }
+
   await setState(tornataId, { ...state, lastSollecitoAt: now });
   return { ok: true, nessunoMancante: false };
 }
