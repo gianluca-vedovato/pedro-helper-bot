@@ -18,7 +18,6 @@
 
 [functions."tornate-reminder"]
   node_bundler = "esbuild"
-  schedule = "*/5 * * * *"
 
 [[redirects]]
   from = "/regole"

@@ -108,31 +108,13 @@ function mention(p: Partecipante): string {
 }
 
 export async function announceTornataStart(tornata: Tornata): Promise<void> {
-  const text = buildMessageText(tornata.id, []);
-  const keyboard = buildKeyboard(tornata.id);
-  const message = await sendMessageWithKeyboard(CHAT_ID, text, keyboard);
-
+  // Annunci automatici per inizio tornata rimossi
+  // Manteniamo lo stato per compatibilità con la logica di conferma
   await setState(tornata.id, {
-    messageId: message.message_id,
+    messageId: 0,
     confirmed: [],
     opened: false,
   });
-
-  const lastPinned = await store().get(LAST_PINNED_KEY, { type: "json" });
-  if (lastPinned && typeof lastPinned === "number") {
-    try {
-      await unpinMessage(CHAT_ID, lastPinned);
-    } catch (error) {
-      console.error("❌ Errore unpin messaggio precedente:", error);
-    }
-  }
-
-  try {
-    await pinMessage(CHAT_ID, message.message_id);
-    await store().setJSON(LAST_PINNED_KEY, message.message_id);
-  } catch (error) {
-    console.error("❌ Errore pin messaggio tornata:", error);
-  }
 }
 
 export async function toggleConfirmation(
@@ -169,14 +151,7 @@ export async function toggleConfirmation(
 }
 
 export async function sendBusteApertePerTornata(tornataId: number): Promise<void> {
-  const admin = PARTECIPANTI.find((p) => p.username === "gianni_cash");
-  const adminMention = admin ? mention(admin) : "@gianni_cash";
-  await sendMessage(
-    CHAT_ID,
-    `🔓 Tutti hanno confermato per la tornata ${tornataId}! ${adminMention} admiiin apri le busteeee`,
-    { parse_mode: "HTML" }
-  );
-
+  // Messaggi automatici per buste rimossi
   await setOverrideInizio(tornataId + 1, Date.now() + NEXT_TORNATA_DELAY_MS);
 }
 
