@@ -1,8 +1,7 @@
 import { getStore } from "@netlify/blobs";
 import type { InlineKeyboardMarkup } from "telegraf/types";
 import partecipantiSeed from "../data/partecipanti.seed.json" with { type: "json" };
-import { sendMessageWithKeyboard, pinMessage, unpinMessage, sendMessage } from "./telegram";
-import type { Tornata } from "./tornateReminders";
+import { sendMessage } from "./telegram";
 
 export type Partecipante = { name: string; username?: string; id?: number };
 
@@ -15,7 +14,6 @@ type TornataBusteState = {
 
 const CHAT_ID = -1002779838745;
 const PARTECIPANTI = partecipantiSeed as Partecipante[];
-const LAST_PINNED_KEY = "last-pinned-message-id";
 const SOLLECITO_COOLDOWN_MS = 5 * 60 * 1000;
 const NEXT_TORNATA_DELAY_MS = 15 * 60 * 1000;
 
@@ -105,16 +103,6 @@ function mention(p: Partecipante): string {
   if (p.username) return `@${p.username}`;
   if (p.id) return `<a href="tg://user?id=${p.id}">${p.name}</a>`;
   return p.name;
-}
-
-export async function announceTornataStart(tornata: Tornata): Promise<void> {
-  // Annunci automatici per inizio tornata rimossi
-  // Manteniamo lo stato per compatibilità con la logica di conferma
-  await setState(tornata.id, {
-    messageId: 0,
-    confirmed: [],
-    opened: false,
-  });
 }
 
 export async function toggleConfirmation(
