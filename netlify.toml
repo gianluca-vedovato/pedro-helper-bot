@@ -16,6 +16,11 @@
 [functions."rules-list"]
   node_bundler = "esbuild"
 
+[functions."formazioni-check"]
+  node_bundler = "esbuild"
+  # Ogni 15 minuti: controlla se è passata un'ora dal primo match di una giornata di Serie A non ancora verificata
+  schedule = "*/15 * * * *"
+
 [[redirects]]
   from = "/regole"
   to = "/.netlify/functions/rules-list"
